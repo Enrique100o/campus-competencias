@@ -1,0 +1,17 @@
+{
+  "folders": [
+    {
+      "name": "Campus · código",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "documentacion": true,
+      "Campus.code-workspace": true
+    },
+    "search.exclude": {
+      "documentacion": true
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "campus-competencias",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["backend", "frontend"],
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "dev": "concurrently -k -n API,WEB -c cyan,green \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
+    "build": "npm run build --workspace frontend",
+    "test": "npm run test --workspace backend",
+    "start": "npm run start --workspace backend"
+  },
+  "devDependencies": { "concurrently": "^9.2.1" }
+}
