@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle, ArrowRight, Building2, Check, ChevronLeft, ChevronRight,
   GraduationCap, LoaderCircle, LogOut, MapPin, Menu, Pencil, Plus,
-  RefreshCw, Search, ShieldCheck, UserRound, Users, X, Trophy, Medal, Code2, ClipboardCheck,
+  RefreshCw, Search, ShieldCheck, UserRound, Users, X, Trophy, Medal, Code2, ClipboardCheck, Trash2,
 } from 'lucide-react';
 import { api, setCsrf } from './api.js';
 import { ProfilePanel, UsersPanel } from './Accounts.jsx';
@@ -93,7 +93,7 @@ function InstitutionDialog({ institution, onClose, onSaved }) {
     setError('');
     try {
       await api(institution ? `/instituciones/${institution.id}` : '/instituciones', {
-        method: institution ? 'PATCH' : 'POST',
+        method: institution ? 'PUT' : 'POST',
         body: { nombre: form.nombre, ciudad: form.ciudad, departamento: form.departamento, tipo: form.tipo, estado: form.estado },
       });
       onSaved(institution ? 'Institución actualizada.' : 'Institución registrada.');
@@ -107,7 +107,7 @@ function InstitutionDialog({ institution, onClose, onSaved }) {
     <form onSubmit={submit}>
       <label>Nombre de la institución<input autoFocus name="nombre" value={form.nombre} onChange={update} required minLength={2} maxLength={150} placeholder="Ej. Universidad del Norte" /></label>
       <div className="form-row">
-        <label>Ciudad<input name="ciudad" value={form.ciudad} onChange={update} required minLength={2} maxLength={100} placeholder="Ej. Barranquilla" /></label>
+        <label>Ciudad/municipio<input name="ciudad" value={form.ciudad} onChange={update} required minLength={2} maxLength={100} placeholder="Ej. Barranquilla" /></label>
         <label>Departamento<input name="departamento" value={form.departamento} onChange={update} required minLength={2} maxLength={100} placeholder="Ej. Atlántico" /></label>
       </div>
       <div className="form-row">
@@ -117,6 +117,44 @@ function InstitutionDialog({ institution, onClose, onSaved }) {
       <div className="form-hint"><ShieldCheck size={16} /><span>Una institución inactiva permanece en el historial.</span></div>
       <ErrorNotice>{error}</ErrorNotice>
       <div className="dialog-actions"><button className="button button-secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</button><button className="button button-primary" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <><Check size={17} />{institution ? 'Guardar cambios' : 'Registrar institución'}</>}</button></div>
+    </form>
+  </dialog>;
+}
+
+function InstitutionDeleteDialog({ institution, onClose, onSaved, onLogout }) {
+  const dialog = useRef(null);
+  const cancel = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [blocked, setBlocked] = useState(false);
+  useEffect(() => { dialog.current.showModal(); cancel.current.focus(); }, []);
+  async function submit(event) {
+    event.preventDefault();
+    if (busy || blocked && institution.estado === 'inactivo') return;
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/instituciones/${institution.id}`, blocked
+        ? { method: 'PATCH', body: { estado: 'inactivo' } }
+        : { method: 'DELETE' });
+      onSaved(blocked ? 'Institución desactivada.' : 'Institución eliminada.');
+    } catch (err) {
+      if (err.status === 401) onLogout();
+      else if (err.status === 404) onSaved('La institución ya no está disponible.');
+      else {
+        if (err.code === 'INSTITUTION_IN_USE') setBlocked(true);
+        setError(err.message);
+      }
+    } finally { setBusy(false); }
+  }
+  return <dialog className="institution-dialog delete-dialog" ref={dialog} onCancel={event => { event.preventDefault(); if (!busy) onClose(); }} aria-labelledby="institution-delete-title" aria-describedby="institution-delete-description">
+    <div className="dialog-heading"><span className="dialog-icon"><Trash2 size={24} /></span><button type="button" className="icon-button" onClick={onClose} disabled={busy} aria-label="Cerrar confirmación"><X size={20} /></button></div>
+    <h2 id="institution-delete-title">{blocked ? 'Conservar el historial' : '¿Eliminar institución?'}</h2>
+    <p id="institution-delete-description">{blocked ? <>La institución <strong>{institution.nombre}</strong> tiene registros relacionados y debe permanecer en la base de datos.</> : <>Se eliminará <strong>{institution.nombre}</strong> de la base de datos. Esta acción no se puede deshacer.</>}</p>
+    <form onSubmit={submit}>
+      <ErrorNotice>{error}</ErrorNotice>
+      {blocked && <p className="form-help">{institution.estado === 'activo' ? 'Puedes desactivarla para impedir nuevas participaciones y mantener los registros existentes.' : 'La institución ya está inactiva y conserva sus registros existentes.'}</p>}
+      <div className="dialog-actions"><button className="button button-secondary" type="button" ref={cancel} onClick={onClose} disabled={busy}>{blocked ? 'Cerrar' : 'Cancelar'}</button>{(!blocked || institution.estado === 'activo') && <button className={`button ${blocked ? 'button-primary' : 'button-danger'}`} disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : blocked ? <><Check size={17} />Desactivar institución</> : <><Trash2 size={17} />Eliminar institución</>}</button>}</div>
     </form>
   </dialog>;
 }
@@ -133,6 +171,7 @@ function Workspace({ user, onLogout, onUserChanged }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dialog, setDialog] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const [toast, setToast] = useState('');
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
@@ -153,7 +192,10 @@ function Workspace({ user, onLogout, onUserChanged }) {
     setLoading(true);
     setError('');
     const params = new URLSearchParams({ page, limit: 8, q: debounced, ...(state ? { estado: state } : {}) });
-    api(`/instituciones?${params}`, { signal: controller.signal }).then(setData).catch(err => {
+    api(`/instituciones?${params}`, { signal: controller.signal }).then(result => {
+      setData(result);
+      if (page > result.pages) setPage(result.pages);
+    }).catch(err => {
       if (err.name === 'AbortError') return;
       if (err.status === 401) onLogout(); else setError(err.message);
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -167,7 +209,7 @@ function Workspace({ user, onLogout, onUserChanged }) {
     finally { setLoggingOut(false); }
   }
   function changeView(next) { setView(next); setMenuOpen(false); }
-  function saved(message) { setDialog(null); setToast(message); setRefresh(value => value + 1); }
+  function saved(message) { setDialog(null); setDeleting(null); setToast(message); setRefresh(value => value + 1); }
   return <div className="workspace">
     {menuOpen && <button className="sidebar-scrim" aria-label="Cerrar menú" onClick={() => setMenuOpen(false)} />}
     <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
@@ -194,13 +236,13 @@ function Workspace({ user, onLogout, onUserChanged }) {
           <section className="summary-grid" aria-label="Resumen de instituciones">
             <div className="summary-card"><span className="summary-icon"><Building2 size={21} /></span><div><span>Instituciones registradas</span><strong>{loading && !data.summary.total ? '—' : data.summary.total}</strong></div><small>Una red que sigue creciendo</small></div>
             <div className="summary-card"><span className="summary-icon mint"><Check size={21} /></span><div><span>Instituciones activas</span><strong>{loading && !data.summary.total ? '—' : data.summary.active}</strong></div><small>Disponibles para participar</small></div>
-            <div className="summary-card"><span className="summary-icon sand"><MapPin size={21} /></span><div><span>Ciudades representadas</span><strong>{loading && !data.summary.total ? '—' : data.summary.cities}</strong></div><small>Conectando nuevas comunidades</small></div>
+            <div className="summary-card"><span className="summary-icon sand"><MapPin size={21} /></span><div><span>Ciudades/municipios representados</span><strong>{loading && !data.summary.total ? '—' : data.summary.cities}</strong></div><small>Conectando nuevas comunidades</small></div>
           </section>
           <section className="directory-card" aria-labelledby="directory-heading">
             <div className="directory-title"><div><h2 id="directory-heading">Directorio de instituciones</h2><p>Consulta y organiza tu comunidad educativa.</p></div><span className="records-label">{data.total} {data.total === 1 ? 'registro' : 'registros'}</span></div>
-            <div className="toolbar"><label className="search-box"><Search size={18} /><input aria-label="Buscar instituciones" placeholder="Buscar por nombre, ciudad o departamento…" value={query} onChange={event => setQuery(event.target.value)} /></label><select aria-label="Filtrar por estado" value={state} onChange={event => { setState(event.target.value); setPage(1); }}><option value="">Todos los estados</option><option value="activo">Activas</option><option value="inactivo">Inactivas</option></select><button className="icon-button refresh-button" aria-label="Actualizar instituciones" onClick={() => setRefresh(value => value + 1)} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} /></button></div>
+            <div className="toolbar"><label className="search-box"><Search size={18} /><input aria-label="Buscar instituciones" placeholder="Buscar por nombre, ciudad/municipio o departamento…" value={query} onChange={event => setQuery(event.target.value)} /></label><select aria-label="Filtrar por estado" value={state} onChange={event => { setState(event.target.value); setPage(1); }}><option value="">Todos los estados</option><option value="activo">Activas</option><option value="inactivo">Inactivas</option></select><button className="icon-button refresh-button" aria-label="Actualizar instituciones" onClick={() => setRefresh(value => value + 1)} disabled={loading}><RefreshCw size={17} className={loading ? 'spin' : ''} /></button></div>
             <ErrorNotice>{error}</ErrorNotice>
-            {loading ? <div className="loading-area" role="status"><LoaderCircle size={25} className="spin" /><span>Cargando instituciones…</span></div> : error ? <div className="empty-state"><AlertCircle size={31} /><h3>No pudimos cargar el directorio</h3><p>Intenta actualizar la información.</p><button className="button button-secondary" onClick={() => setRefresh(value => value + 1)}>Volver a intentar</button></div> : !data.items.length ? <div className="empty-state"><span className="empty-icon"><Building2 size={35} strokeWidth={1.5} /></span><h3>{query || state ? 'No encontramos coincidencias' : admin ? 'Tu comunidad comienza aquí' : 'Todavía no hay instituciones'}</h3><p>{query || state ? 'Prueba con otro nombre o cambia los filtros.' : admin ? 'Registra la primera institución para empezar a construir tu directorio.' : 'Las instituciones aparecerán aquí cuando el administrador las registre.'}</p>{admin && !query && !state && <button className="button button-secondary" onClick={() => setDialog({ institution: null })}><Plus size={16} />Registrar una institución</button>}</div> : <div className="table-scroll"><table><thead><tr><th>Institución</th><th>Ubicación</th><th>Tipo</th><th>Estado</th>{admin && <th><span className="sr-only">Acciones</span></th>}</tr></thead><tbody>{data.items.map(item => <tr key={item.id}><td><div className="institution-name"><span className={`institution-avatar type-${item.tipo}`}><Building2 size={19} /></span><strong>{item.nombre}</strong></div></td><td><div className="location-cell"><span>{item.ciudad}</span><small>{item.departamento}</small></div></td><td><span className="type-label">{types[item.tipo]}</span></td><td><span className={`badge ${item.estado === 'activo' ? 'badge-active' : 'badge-inactive'}`}><span />{item.estado === 'activo' ? 'Activa' : 'Inactiva'}</span></td>{admin && <td><button className="icon-button edit-button" aria-label={`Editar ${item.nombre}`} onClick={() => setDialog({ institution: item })}><Pencil size={16} /></button></td>}</tr>)}</tbody></table></div>}
+            {loading ? <div className="loading-area" role="status"><LoaderCircle size={25} className="spin" /><span>Cargando instituciones…</span></div> : error ? <div className="empty-state"><AlertCircle size={31} /><h3>No pudimos cargar el directorio</h3><p>Intenta actualizar la información.</p><button className="button button-secondary" onClick={() => setRefresh(value => value + 1)}>Volver a intentar</button></div> : !data.items.length ? <div className="empty-state"><span className="empty-icon"><Building2 size={35} strokeWidth={1.5} /></span><h3>{query || state ? 'No encontramos coincidencias' : admin ? 'Tu comunidad comienza aquí' : 'Todavía no hay instituciones'}</h3><p>{query || state ? 'Prueba con otro nombre o cambia los filtros.' : admin ? 'Registra la primera institución para empezar a construir tu directorio.' : 'Las instituciones aparecerán aquí cuando el administrador las registre.'}</p>{admin && !query && !state && <button className="button button-secondary" onClick={() => setDialog({ institution: null })}><Plus size={16} />Registrar una institución</button>}</div> : <div className="table-scroll"><table><thead><tr><th>Institución</th><th>Ciudad/municipio</th><th>Tipo</th><th>Estado</th>{admin && <th><span className="sr-only">Acciones</span></th>}</tr></thead><tbody>{data.items.map(item => <tr key={item.id}><td><div className="institution-name"><span className={`institution-avatar type-${item.tipo}`}><Building2 size={19} /></span><strong>{item.nombre}</strong></div></td><td><div className="location-cell"><span>{item.ciudad}</span><small>{item.departamento}</small></div></td><td><span className="type-label">{types[item.tipo]}</span></td><td><span className={`badge ${item.estado === 'activo' ? 'badge-active' : 'badge-inactive'}`}><span />{item.estado === 'activo' ? 'Activa' : 'Inactiva'}</span></td>{admin && <td><div className="row-actions"><button className="icon-button edit-button" title="Editar institución" aria-label={`Editar ${item.nombre}`} onClick={() => setDialog({ institution: item })}><Pencil size={16} /></button><button className="icon-button delete-button" title="Eliminar institución" aria-label={`Eliminar ${item.nombre}`} onClick={() => setDeleting(item)}><Trash2 size={16} /></button></div></td>}</tr>)}</tbody></table></div>}
             <div className="table-footer"><span>{data.total ? `Página ${page} de ${data.pages}` : 'Sin registros para mostrar'}</span><div><button className="pagination-button" aria-label="Página anterior" disabled={page <= 1 || loading} onClick={() => setPage(value => value - 1)}><ChevronLeft size={17} /></button><button className="pagination-button" aria-label="Página siguiente" disabled={page >= data.pages || loading} onClick={() => setPage(value => value + 1)}><ChevronRight size={17} /></button></div></div>
           </section>
           <div className="bottom-note"><ShieldCheck size={15} /><span>La información de tu comunidad, organizada en un solo lugar.</span><span className="bottom-note-brand">campus.</span></div>
@@ -208,6 +250,7 @@ function Workspace({ user, onLogout, onUserChanged }) {
       </main>
     </div>
     {dialog && <InstitutionDialog institution={dialog.institution} onClose={() => setDialog(null)} onSaved={saved} />}
+    {deleting && <InstitutionDeleteDialog institution={deleting} onClose={() => setDeleting(null)} onSaved={saved} onLogout={onLogout} />}
     {toast && <div className="toast" role="status"><Check size={18} />{toast}</div>}
   </div>;
 }

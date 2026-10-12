@@ -59,6 +59,42 @@ npm run build
 
 Las pruebas requieren MongoDB y crean bases temporales separadas de la aplicación. La compilación genera `frontend/dist`.
 
+## CRUD con Mongoose
+
+El recurso de instituciones permite demostrar los cuatro métodos solicitados en la materia. Las rutas están en `backend/src/app.js` y el modelo en `backend/src/models.js`.
+
+| Método | Ruta | Operación con Mongoose |
+| --- | --- | --- |
+| GET | `/api/instituciones` | Listar con `find`, filtros y paginación. |
+| GET | `/api/instituciones/:id` | Consultar con `findById`. |
+| POST | `/api/instituciones` | Registrar con `create`. |
+| PUT | `/api/instituciones/:id` | Actualizar todos los campos editables con `findByIdAndUpdate`. |
+| DELETE | `/api/instituciones/:id` | Eliminar con `findByIdAndDelete`, si no tiene relaciones. |
+
+`PATCH` sigue disponible para cambios parciales. Las consultas requieren una sesión; las escrituras requieren administrador y token CSRF. El formulario web de edición de instituciones utiliza `PUT`.
+
+Desde la pantalla **Instituciones**, el administrador puede usar el lápiz para editar o la papelera para eliminar. La eliminación solicita confirmación y actualiza el directorio y sus contadores. Si hay participantes, equipos o inscripciones vinculados, se conserva la institución y se ofrece desactivarla. El campo **Ciudad/municipio** mantiene la propiedad `ciudad` en MongoDB y en la API.
+
+Para probarlo desde un cliente de API:
+
+1. Inicia sesión con `POST http://127.0.0.1:3001/api/auth/login`, enviando tu `correo` y `password` en JSON. El cliente debe conservar la cookie de sesión.
+2. Copia `data.csrfToken` de la respuesta y envíalo en el encabezado `X-CSRF-Token` de las solicitudes POST, PUT y DELETE de instituciones.
+3. Crea una institución con POST y guarda el `data.id` devuelto. Utiliza ese identificador para GET, PUT y DELETE.
+
+Ejemplo de cuerpo para POST y PUT:
+
+```json
+{
+  "nombre": "Colegio de demostración",
+  "ciudad": "Bogotá",
+  "departamento": "Cundinamarca",
+  "tipo": "colegio",
+  "estado": "activo"
+}
+```
+
+PUT exige los cinco campos. DELETE no necesita cuerpo; elimina únicamente una institución sin participantes, equipos ni inscripciones relacionadas. Si tiene historial, responde 409 y permite conservarlo desactivando la institución. Estas reglas están comprobadas en las pruebas de integración, incluidas solicitudes simultáneas.
+
 ## Visual Studio Code
 
 Abre `Campus.code-workspace` para una vista centrada en el código. Para consultar los documentos desde el explorador, abre la carpeta completa del repositorio. Las dependencias y archivos generados se ocultan mediante `.vscode/settings.json`.

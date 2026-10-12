@@ -1,10 +1,31 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import { User, Institution, publicUser, publicInstitution, states } from './models.js';
-import { ApiError, credentials, institutionInput, escapedSearch } from './validation.js';
+import { ApiError, credentials, institutionInput, escapedSearch, formFields } from './validation.js';
 import { COOKIE, authLimiter, cookieOptions, createSession, hashPassword, verifyPassword, requireSession, requireAdmin, requireCsrf } from './security.js';
 import { usersRouter } from './users.js';
 import { competitionRouter } from './competition-routes.js';
+import { Participant, Team, Registration } from './competition-models.js';
+import { competitionWrite, refreshActor, requireRoles } from './competition-service.js';
+
+const institutionFields = ['nombre', 'ciudad', 'departamento', 'tipo', 'estado'];
+function institutionId(value) {
+  if (!mongoose.isObjectIdOrHexString(value)) throw new ApiError(400, 'Identificador de institución inválido.');
+  return value;
+}
+async function institutionRecord(value) {
+  const record = await Institution.findById(institutionId(value));
+  if (!record) throw new ApiError(404, 'Institución no encontrada.', 'NOT_FOUND');
+  return record;
+}
+function institutionWrite(req, operation) {
+  // Comparte la cola con las nuevas asociaciones para evitar referencias a registros eliminados.
+  return competitionWrite(async () => {
+    await refreshActor(req);
+    requireRoles(req.user, ['administrador']);
+    return operation();
+  });
+}
 
 export function createApp(config) {
   const app = express();
@@ -62,7 +83,6 @@ export function createApp(config) {
   });
 
   app.use('/api/usuarios', usersRouter(authenticated));
-  app.use('/api', competitionRouter(authenticated));
 
   app.get('/api/instituciones', authenticated, async (req, res) => {
     const page = Number(req.query.page || 1);
@@ -86,18 +106,56 @@ export function createApp(config) {
   });
 
   app.post('/api/instituciones', authenticated, requireAdmin, requireCsrf, async (req, res) => {
-    const institution = await Institution.create(institutionInput(req.body));
+    formFields(req.body, institutionFields);
+    const institution = await institutionWrite(req, () => Institution.create(institutionInput(req.body)));
     res.status(201).json({ data: publicInstitution(institution) });
   });
 
-  app.patch('/api/instituciones/:id', authenticated, requireAdmin, requireCsrf, async (req, res) => {
-    if (!mongoose.isObjectIdOrHexString(req.params.id)) throw new ApiError(400, 'Identificador de institución inválido.');
-    const institution = await Institution.findById(req.params.id);
-    if (!institution) throw new ApiError(404, 'Institución no encontrada.', 'NOT_FOUND');
-    Object.assign(institution, institutionInput({ ...publicInstitution(institution), ...req.body }));
-    await institution.save();
+  app.get('/api/instituciones/:id', authenticated, async (req, res) => {
+    res.json({ data: publicInstitution(await institutionRecord(req.params.id)) });
+  });
+
+  app.put('/api/instituciones/:id', authenticated, requireAdmin, requireCsrf, async (req, res) => {
+    formFields(req.body, institutionFields);
+    if (institutionFields.some(field => !Object.hasOwn(req.body, field)) || !states.includes(req.body.estado)) {
+      throw new ApiError(400, 'PUT requiere nombre, ciudad, departamento, tipo y estado válidos.');
+    }
+    const institution = await institutionWrite(req, async () => {
+      const input = institutionInput(req.body);
+      const updated = await Institution.findByIdAndUpdate(institutionId(req.params.id), input, { returnDocument: 'after', runValidators: true });
+      if (!updated) throw new ApiError(404, 'Institución no encontrada.', 'NOT_FOUND');
+      return updated;
+    });
     res.json({ data: publicInstitution(institution) });
   });
+
+  app.patch('/api/instituciones/:id', authenticated, requireAdmin, requireCsrf, async (req, res) => {
+    formFields(req.body, institutionFields);
+    const institution = await institutionWrite(req, async () => {
+      const record = await institutionRecord(req.params.id);
+      Object.assign(record, institutionInput({ ...publicInstitution(record), ...req.body }));
+      return record.save();
+    });
+    res.json({ data: publicInstitution(institution) });
+  });
+
+  app.delete('/api/instituciones/:id', authenticated, requireAdmin, requireCsrf, async (req, res) => {
+    const deleted = await institutionWrite(req, async () => {
+      const institution = await institutionRecord(req.params.id);
+      const references = await Promise.all([
+        Participant.exists({ institucion: institution._id }),
+        Team.exists({ institucion: institution._id }),
+        Registration.exists({ $or: [{ institucion: institution._id }, { 'plantilla.institucion': institution._id }] }),
+      ]);
+      if (references.some(Boolean)) throw new ApiError(409, 'La institución tiene participantes, equipos o inscripciones. Desactívala para conservar su historial.', 'INSTITUTION_IN_USE');
+      const deleted = await Institution.findByIdAndDelete(institution._id);
+      if (!deleted) throw new ApiError(404, 'Institución no encontrada.', 'NOT_FOUND');
+      return deleted;
+    });
+    res.json({ data: { id: String(deleted._id), message: 'Institución eliminada.' } });
+  });
+
+  app.use('/api', competitionRouter(authenticated));
 
   app.use((req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Recurso no encontrado.' } }));
   app.use((error, req, res, next) => {

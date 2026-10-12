@@ -6,7 +6,7 @@ import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { readConfig } from '../src/config.js';
 import { User, Session, Institution, initializeModels } from '../src/models.js';
-import { competitionModels, Participant, Registration } from '../src/competition-models.js';
+import { competitionModels, Participant, Registration, Team } from '../src/competition-models.js';
 
 const db = `codex_campus_test_${process.pid}_${randomBytes(6).toString('hex')}`;
 const config = { ...readConfig(), allowInitialSetup: true, production: false };
@@ -201,5 +201,70 @@ describe('Competencias: flujos y reglas con MongoDB real', () => {
     await write(admin, 'patch', `usuarios/${accounts[1].id}`, { estado: 'inactivo' }).expect(200);
     await write(admin, 'post', 'inscripciones', { torneo: event.id, modalidad: 'equipo', competidor: existing.id }).expect(400);
     assert.equal(await Registration.countDocuments({}), 0);
+  });
+
+  it('realiza GET, POST, PUT y DELETE de instituciones con persistencia y actualización completa', async () => {
+    const body = { nombre: 'Institución CRUD', ciudad: 'Bogotá', departamento: 'Cundinamarca', tipo: 'colegio', estado: 'activo' };
+    const record = await create('instituciones', body);
+    const read = await admin.agent.get(`/api/instituciones/${record.id}`).expect(200);
+    assert.equal(read.body.data.nombre, body.nombre);
+    await write(admin, 'put', `instituciones/${record.id}`, { nombre: 'Incompleta' }).expect(400);
+    await write(admin, 'put', `instituciones/${record.id}`, { ...body, estado: '' }).expect(400);
+    await write(admin, 'put', `instituciones/${record.id}`, { ...body, campoExtra: 'No permitido' }).expect(400);
+    const replacement = { nombre: 'Universidad CRUD', ciudad: 'Medellín', departamento: 'Antioquia', tipo: 'universidad', estado: 'inactivo' };
+    const updated = await write(admin, 'put', `instituciones/${record.id}`, replacement).expect(200);
+    for (const [key, value] of Object.entries(replacement)) assert.equal(updated.body.data[key], value);
+    assert.equal(updated.body.data.createdAt, record.createdAt);
+    assert.equal((await Institution.findById(record.id)).ciudad, 'Medellín');
+    const duplicate = await create('instituciones', body);
+    await write(admin, 'put', `instituciones/${record.id}`, body).expect(409);
+    assert.equal((await Institution.findById(record.id)).nombre, replacement.nombre);
+    await write(admin, 'delete', `instituciones/${record.id}`, {}).expect(200);
+    assert.equal(await Institution.exists({ _id: record.id }), null);
+    await admin.agent.get(`/api/instituciones/${record.id}`).expect(404);
+    await write(admin, 'delete', `instituciones/${record.id}`, {}).expect(404);
+    await admin.agent.get('/api/instituciones/no-es-un-id').expect(400);
+    await write(admin, 'put', 'instituciones/no-es-un-id', body).expect(400);
+    await write(admin, 'put', `instituciones/${new mongoose.Types.ObjectId()}`, body).expect(404);
+    assert.ok(await Institution.exists({ _id: duplicate.id }));
+  });
+
+  it('protege PUT y DELETE con sesión, rol, CSRF y conservación de instituciones relacionadas', async () => {
+    const body = { nombre: 'Institución protegida', ciudad: 'Bogotá', departamento: 'Cundinamarca', tipo: 'colegio', estado: 'activo' };
+    const record = await create('instituciones', body);
+    await request(app).get(`/api/instituciones/${record.id}`).expect(401);
+    await admin.agent.put(`/api/instituciones/${record.id}`).send(body).expect(403);
+    await admin.agent.delete(`/api/instituciones/${record.id}`).expect(403);
+    const participant = await login(accounts[0]);
+    await participant.agent.get(`/api/instituciones/${record.id}`).expect(200);
+    await write(participant, 'put', `instituciones/${record.id}`, body).expect(403);
+    await write(participant, 'delete', `instituciones/${record.id}`, {}).expect(403);
+    const blocked = await write(admin, 'delete', `instituciones/${institution.id}`, {}).expect(409);
+    assert.equal(blocked.body.error.code, 'INSTITUTION_IN_USE');
+    assert.ok(await Institution.exists({ _id: institution.id }));
+    await create('equipos', team({ institucion: record.id, integrantes: [] }));
+    await write(admin, 'delete', `instituciones/${record.id}`, {}).expect(409);
+    const historic = await create('instituciones', { ...body, nombre: 'Institución histórica' });
+    const user = await create('usuarios', { nombre: 'Participante histórico', correo: 'historico@example.test', password, rol: 'participante', estado: 'activo' });
+    const person = await create('participantes', { documento: 'HISTORICO', nombre: user.nombre, nacimiento: '2005-01-01', genero: 'otro', usuario: user.id, institucion: historic.id, categoria: 'Abierta', estado: 'activo' });
+    const event = await open(tournament({ nombre: 'Torneo histórico', unidadInscripcion: 'individual', formato: 'pruebas' }));
+    await create('inscripciones', { torneo: event.id, modalidad: 'individual', competidor: person.id, prueba: '100 metros' });
+    await write(admin, 'patch', `participantes/${person.id}`, { institucion: institution.id }).expect(200);
+    assert.equal(await Participant.exists({ institucion: historic.id }), null);
+    assert.equal(await Team.exists({ institucion: historic.id }), null);
+    await write(admin, 'delete', `instituciones/${historic.id}`, {}).expect(409);
+    assert.ok(await Institution.exists({ _id: historic.id }));
+  });
+
+  it('coordina eliminación y creación simultánea de participantes sin dejar referencias inexistentes', async () => {
+    const target = await create('instituciones', { nombre: 'Institución concurrente', ciudad: 'Bogotá', departamento: 'Cundinamarca', tipo: 'colegio', estado: 'activo' });
+    const user = await create('usuarios', { nombre: 'Participante concurrente', correo: 'concurrente@example.test', password, rol: 'participante', estado: 'activo' });
+    const [creation, deletion] = await Promise.all([
+      write(admin, 'post', 'participantes', { documento: 'CONCURRENTE', nombre: user.nombre, nacimiento: '2005-01-01', genero: 'otro', usuario: user.id, institucion: target.id, categoria: 'Abierta', estado: 'activo' }),
+      write(admin, 'delete', `instituciones/${target.id}`, {}),
+    ]);
+    assert.ok(creation.status === 201 && deletion.status === 409 || creation.status === 400 && deletion.status === 200);
+    const linked = await Participant.exists({ institucion: target.id });
+    if (linked) assert.ok(await Institution.exists({ _id: target.id }));
   });
 });
