@@ -23,7 +23,7 @@ try {
   await initializeModels();
   server = createApp(config).listen(config.port, config.host, () => {
     console.log(`API disponible en http://${config.host}:${config.port}`);
-    console.log('MongoDB conectado. La base se crea al guardar el primer registro.');
+    console.log('MongoDB conectado y modelos inicializados.');
   });
   server.on('error', async () => {
     console.error(`No se pudo abrir el puerto ${config.port}. Revisa si ya hay otro servidor utilizándolo.`);

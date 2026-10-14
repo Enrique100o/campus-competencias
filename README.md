@@ -37,13 +37,27 @@ Acceso, cuentas, perfil, instituciones, disciplinas, torneos, configuración de 
 
 Escenarios, demás etapas, inscripción a hackatones, agenda, resultados, proyectos y evaluación están pendientes. La entrega actual se ejecuta localmente con una instancia de API; los cupos concurrentes requieren coordinación compartida si se despliega con varias instancias.
 
+## Historias del MVP y demostración de la API
+
+La [guía del MVP](docs/parcial-2.md) documenta diez historias de usuario, su funcionalidad, método HTTP, endpoint y resultado esperado. Incluye las instrucciones para Thunder Client y MongoDB Compass, el guion de sustentación y la ubicación de cada parte del código.
+
+Para preparar datos ficticios y peticiones locales del ensayo:
+
+```powershell
+npm run parcial:preparar
+```
+
+Utiliza la misma API en el puerto 3002 y la base separada `campus_parcial_demo`. Mantén esa terminal abierta y consulta las instrucciones de la guía. Después de ejecutar las diez peticiones, `npm run parcial:verificar` comprueba su persistencia directamente en MongoDB.
+
 ## Dónde está cada parte
 
 | Carpeta o archivo | Contenido |
 | --- | --- |
 | `backend/src` | API, modelos de la base, validaciones, permisos y conexión MongoDB. |
 | `backend/tests` | Pruebas de integración con bases temporales. |
+| `backend/scripts` y `backend/parcial` | Preparación de datos y peticiones de demostración de la API. |
 | `frontend/src` | Pantallas, formularios, solicitudes a la API y estilos. |
+| `docs` | Historias del MVP y guía pública de demostración. |
 | `frontend/index.html` y `frontend/vite.config.js` | Entrada web y configuración de desarrollo. |
 | `package.json` y `package-lock.json` | Comandos y versiones de las dependencias. |
 | `documentacion` | Material académico local, excluido de Git. |

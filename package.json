@@ -8,7 +8,9 @@
     "dev": "concurrently -k -n API,WEB -c cyan,green \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
     "build": "npm run build --workspace frontend",
     "test": "npm run test --workspace backend",
-    "start": "npm run start --workspace backend"
+    "start": "npm run start --workspace backend",
+    "parcial:preparar": "node backend/scripts/parcial.js preparar",
+    "parcial:verificar": "node backend/scripts/parcial.js verificar"
   },
   "devDependencies": { "concurrently": "^9.2.1" }
 }
