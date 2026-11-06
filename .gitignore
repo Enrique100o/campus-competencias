@@ -12,3 +12,7 @@ __pycache__/
 
 # Documentación académica y entregables conservados solo en la copia local.
 documentacion/
+
+# Espacios locales de Postman que pueden incluir credenciales o sesiones de prueba.
+.postman/
+postman/

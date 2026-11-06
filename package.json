@@ -2,15 +2,24 @@
   "name": "campus-competencias",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["backend", "frontend"],
-  "engines": { "node": ">=22.12.0" },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "concurrently -k -n API,WEB -c cyan,green \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
     "build": "npm run build --workspace frontend",
-    "test": "npm run test --workspace backend",
+    "test": "npm run test --workspace backend && npm run test --workspace frontend",
+    "format": "prettier --write backend/src backend/tests frontend/src frontend/tests",
     "start": "npm run start --workspace backend",
     "parcial:preparar": "node backend/scripts/parcial.js preparar",
     "parcial:verificar": "node backend/scripts/parcial.js verificar"
   },
-  "devDependencies": { "concurrently": "^9.2.1" }
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.9.10"
+  }
 }

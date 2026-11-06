@@ -1,5 +1,7 @@
 # Campus: diez funcionalidades del sistema
 
+Guía histórica del parcial de octubre de 2026. La versión ampliada y la ubicación actual del código se documentan en [las 32 historias](historias-usuario.md) y [la arquitectura](arquitectura.md).
+
 La exposición utiliza el proyecto habitual: interfaz web, API REST con Node.js y Express y MongoDB mediante Mongoose. Cada fila delimita la acción concreta que se muestra y conserva el identificador HU del proyecto.
 
 ## Registro de las 10 funcionalidades

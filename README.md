@@ -1,31 +1,55 @@
 # Campus: gestión de competencias
 
-Plataforma para gestionar torneos universitarios, intercolegiados y hackatones. Desarrollada con Node.js, Express, MongoDB y Mongoose; interfaz web con React y Vite.
+Plataforma para torneos universitarios, intercolegiados multideportivos y hackatones. React con Vite, API REST con Node.js y Express, y MongoDB mediante Mongoose.
 
-## Historias de usuario del MVP
+**Estado: entrega académica finalizada — 6 de noviembre de 2026.** Alcance de 32 historias de usuario implementadas, con interfaz web, API REST y persistencia en MongoDB. Verificación: 69 pruebas automatizadas y compilación de la interfaz aprobadas.
 
-| ID | Historia de usuario |
+La entrega está preparada para ejecución local con una instancia de API. El despliegue público y la coordinación entre varias instancias corresponden a una etapa posterior.
+
+## Historias de usuario
+
+Las siguientes funcionalidades corresponden a las **32 historias del alcance acordado**:
+
+| ID | Funcionalidad |
 | --- | --- |
-| HU001 | Como usuario quiero iniciar y cerrar sesión para acceder a las funciones que me corresponden en la plataforma. |
-| HU003 | Como administrador quiero registrar y administrar usuarios para habilitar las cuentas que utilizarán la plataforma. |
-| HU004 | Como usuario quiero consultar y actualizar los datos permitidos de mi perfil para mantener mi información correcta. |
-| HU005 | Como administrador quiero gestionar instituciones educativas para asociarlas a los participantes y equipos de los eventos. |
-| HU006 | Como administrador quiero configurar disciplinas, categorías y modalidades para organizar las distintas competencias deportivas. |
-| HU008 | Como organizador quiero crear torneos deportivos para gestionar competencias universitarias e intercolegiadas de distintas disciplinas. |
-| HU009 | Como administrador quiero crear hackatones con fechas, categorías y límites de equipos para organizar eventos de innovación tecnológica. |
-| HU010 | Como organizador quiero definir el reglamento de mi torneo para aplicar elegibilidad, puntuación, fases y desempates según la disciplina. |
-| HU012 | Como organizador quiero registrar y gestionar participantes para identificar a las personas que competirán en los eventos. |
-| HU013 | Como usuario autorizado quiero registrar un equipo para utilizarlo en competencias deportivas o hackatones. |
-| HU015 | Como participante quiero consultar torneos y hackatones disponibles para conocer sus requisitos y decidir dónde participar. |
-| HU016 | Como usuario autorizado quiero inscribir un equipo, participante o relevo en un torneo para formalizar su participación deportiva. |
+| HU001 | Iniciar y cerrar sesión |
+| HU002 | Controlar acceso por rol y recurso |
+| HU003 | Registrar y administrar usuarios |
+| HU004 | Consultar y actualizar mi perfil |
+| HU005 | Gestionar instituciones educativas |
+| HU006 | Gestionar disciplinas, categorías y modalidades |
+| HU007 | Gestionar escenarios e instalaciones |
+| HU008 | Crear torneos deportivos |
+| HU009 | Crear hackatones |
+| HU010 | Definir el reglamento deportivo |
+| HU011 | Gestionar etapas y fechas de eventos |
+| HU012 | Registrar y gestionar participantes |
+| HU013 | Registrar equipos deportivos y tecnológicos |
+| HU014 | Gestionar integrantes de equipos |
+| HU015 | Consultar eventos y requisitos |
+| HU016 | Inscribir competidores en torneos |
+| HU017 | Inscribir equipos en hackatones |
+| HU018 | Revisar y gestionar inscripciones |
+| HU019 | Programar competencias deportivas |
+| HU020 | Consultar la agenda deportiva |
+| HU021 | Registrar resultados deportivos |
+| HU022 | Consultar clasificaciones y avance |
+| HU023 | Corregir resultados deportivos |
+| HU024 | Cerrar torneos y publicar resultados |
+| HU025 | Registrar y actualizar proyectos |
+| HU026 | Entregar el proyecto para evaluación |
+| HU027 | Configurar la rúbrica de evaluación |
+| HU028 | Asignar jurados a proyectos |
+| HU029 | Registrar evaluaciones de proyectos |
+| HU030 | Consultar y corregir mi evaluación |
+| HU031 | Consultar y publicar el reporte del hackatón |
+| HU032 | Consultar historial de cambios relevantes |
 
-La inscripción a hackatones, la agenda, los resultados, las entregas de proyectos y la evaluación corresponden a etapas posteriores del desarrollo.
+Consulta los [criterios, endpoints y pantallas de las 32 historias](docs/historias-usuario.md) y la [organización y arquitectura](docs/arquitectura.md).
 
 ## Instalación y ejecución
 
-Requisitos: Node.js 22.12 o superior, npm y un servidor MongoDB iniciado.
-
-En una copia nueva del repositorio, ejecuta desde la carpeta del proyecto:
+Requisitos: Node.js 22.12 o superior, npm y MongoDB iniciado. En un clon nuevo:
 
 ```powershell
 npm ci
@@ -33,18 +57,27 @@ Copy-Item backend/.env.example backend/.env
 npm run dev
 ```
 
-En macOS o Linux, utiliza `cp backend/.env.example backend/.env` para crear el archivo de configuración. Ajusta `MONGODB_URI` en `backend/.env` si tu conexión es diferente.
+En macOS/Linux usa `cp backend/.env.example backend/.env`. Ajusta `MONGODB_URI` cuando corresponda. En el primer acceso crea el administrador desde la web.
 
-- Interfaz web: `http://127.0.0.1:5173`.
-- API REST: `http://127.0.0.1:3001/api`.
-- Base de datos local predeterminada: `torneos_universidad`.
+- Web: http://127.0.0.1:5173
+- API: http://127.0.0.1:3001/api
+- Base local: `torneos_universidad`
 
-En el primer acceso, crea la cuenta de administrador desde la interfaz. Para detener el sistema, pulsa **Ctrl+C** en la terminal.
+Las ventanas de inscripción, entrega y evaluación se configuran por evento. Para pasar de etapa también se deben cumplir sus fechas y requisitos.
 
 ## Organización
 
-- `backend/src`: API REST, modelos de Mongoose, validaciones y conexión a MongoDB.
-- `frontend/src`: pantallas, formularios y estilos de la interfaz.
-- `backend/tests`: pruebas de integración.
+- `frontend/src/features`: pantallas y formularios por funcionalidad.
+- `frontend/src/components/ui`: campos, diálogos y componentes compartidos.
+- `backend/src/modules`: servicios, permisos y rutas por área de negocio.
+- `backend/src/app.js`: composición de la API.
+- `backend/tests` y `frontend/tests`: pruebas con datos ficticios.
 
-Para ejecutar las pruebas utiliza `npm test`; para compilar la interfaz, `npm run build`.
+## Verificación
+
+```powershell
+npm test
+npm run build
+```
+
+Las pruebas de API utilizan bases temporales aisladas. `npm run format` mantiene un formato de código uniforme. En producción configura `JWT_SECRET` con al menos 32 caracteres aleatorios y utiliza HTTPS.
