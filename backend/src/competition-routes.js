@@ -20,19 +20,17 @@ import {
 import { requireCsrf } from "./security.js";
 import {
   competitionWrite,
-  disciplineInput,
-  tournamentInput,
-  hackathonInput,
-  participantInput,
-  teamInput,
-  registerCompetitor,
   id,
   managesEvent,
-  readableEvent,
   ownsRecord,
   refreshActor,
   requireRoles,
-} from "./competition-service.js";
+} from "./modules/shared/access.js";
+import { disciplineInput } from "./modules/catalogs/disciplines.js";
+import { tournamentInput, hackathonInput } from "./modules/events/input.js";
+import { participantInput } from "./modules/participants/input.js";
+import { teamInput } from "./modules/teams/input.js";
+import { registerCompetitor } from "./modules/registrations/sports.js";
 import { changeStage } from "./modules/events/service.js";
 import { audit } from "./modules/workflow/common.js";
 

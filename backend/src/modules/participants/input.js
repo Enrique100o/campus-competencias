@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import { User, Institution } from "../../models.js";
 
 import { ApiError, formFields, text } from "../../validation.js";

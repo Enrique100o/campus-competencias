@@ -7,7 +7,7 @@ import {
   Team,
   Registration,
 } from "../../competition-models.js";
-import { competitionWrite, refreshActor } from "../../competition-service.js";
+import { competitionWrite, refreshActor } from "../shared/access.js";
 import { requireCsrf } from "../../security.js";
 import { listPagination, escapedSearch } from "../../validation.js";
 import {
@@ -29,7 +29,6 @@ import {
   requireRoles,
   plain,
   list,
-  audit,
   formFields,
 } from "./common.js";
 import { saveVenue } from "../venues/service.js";

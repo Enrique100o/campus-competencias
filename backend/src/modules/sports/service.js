@@ -12,7 +12,6 @@ import {
   plain,
 } from "../workflow/common.js";
 
-const running = ["programada", "reprogramada"];
 // Solo se usan nombres y la plantilla confirmada en agenda/resultados: nunca documentos de identidad.
 /** Programa o reprograma con inscripciones confirmadas. Comprueba cruces del escenario, competidores e integrantes. */
 export async function scheduleCompetition(req, previous) {

@@ -67,7 +67,7 @@ El refresh usa Cookie `HttpOnly`, `SameSite=Lax`, origen validado y cuerpo JSON;
 | `frontend/src/components/ui` | Marca, campos, diálogos, tablas y avisos reutilizables. |
 | `frontend/src/hooks/useResource.js` | Consulta de datos, cancelación de consultas previas y recarga. |
 
-`competition-service.js`, `Accounts.jsx` y `Competitions.jsx` mantienen exportaciones de compatibilidad; la implementación está distribuida en sus módulos. Los comentarios explican validaciones, decisiones y conservación de datos, sin repetir cada instrucción del lenguaje.
+Las rutas importan directamente los servicios de su módulo y las pantallas importan sus componentes por funcionalidad. Los comentarios explican validaciones, decisiones y conservación de datos, sin repetir cada instrucción del lenguaje.
 
 ## Permisos
 

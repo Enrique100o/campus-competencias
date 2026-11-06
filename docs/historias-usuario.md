@@ -2,7 +2,7 @@
 
 Actualización: 5 de noviembre de 2026. Alcance: matriz v3 de 32 historias, con interfaz web, API REST y MongoDB/Mongoose.
 
-Antes: 12 completas, 3 parciales, 17 pendientes. Ahora: 32 implementadas. Una petición exitosa no equivale a una historia adicional: cada código conserva su necesidad y sus criterios originales.
+Estado: **32 historias implementadas**. Cada código conserva su necesidad y sus criterios de aceptación.
 
 ## Ubicación funcional
 

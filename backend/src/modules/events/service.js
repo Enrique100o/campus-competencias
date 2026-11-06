@@ -5,7 +5,8 @@ import {
   Evaluation,
 } from "../workflow/models.js";
 import { Registration, Participant } from "../../competition-models.js";
-import { eventDates, eligible } from "../../competition-service.js";
+import { eventDates } from "./input.js";
+import { eligible } from "../shared/access.js";
 import { standings } from "../sports/service.js";
 import { hackathonReport } from "../hackathons/evaluations.js";
 import {

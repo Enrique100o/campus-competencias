@@ -13,7 +13,7 @@ import {
   competitionWrite,
   refreshActor,
   requireRoles,
-} from "../../competition-service.js";
+} from "../shared/access.js";
 import { HackRegistration } from "../workflow/models.js";
 // CRUD de instituciones: eliminación física únicamente cuando no hay relaciones.
 const institutionFields = [

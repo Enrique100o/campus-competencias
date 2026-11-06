@@ -1,5 +1,3 @@
-import mongoose from "mongoose";
-
 import {
   Tournament,
   Team,

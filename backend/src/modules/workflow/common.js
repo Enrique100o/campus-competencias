@@ -5,7 +5,7 @@ import {
   reference,
   requireRoles,
   readableEvent,
-} from "../../competition-service.js";
+} from "../shared/access.js";
 import {
   Tournament,
   Hackathon,

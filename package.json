@@ -14,9 +14,7 @@
     "build": "npm run build --workspace frontend",
     "test": "npm run test --workspace backend && npm run test --workspace frontend",
     "format": "prettier --write backend/src backend/tests frontend/src frontend/tests",
-    "start": "npm run start --workspace backend",
-    "parcial:preparar": "node backend/scripts/parcial.js preparar",
-    "parcial:verificar": "node backend/scripts/parcial.js verificar"
+    "start": "npm run start --workspace backend"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
