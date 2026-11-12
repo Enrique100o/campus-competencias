@@ -7,7 +7,10 @@ export function errorHandler(error, req, res, next) {
       : "Ya existe un registro con esos datos.";
     if (req.path.startsWith("/api/setup"))
       message = "La cuenta inicial ya existe. Inicia sesión.";
-    else if (req.path.startsWith("/api/usuarios"))
+    else if (
+      req.path.startsWith("/api/usuarios") ||
+      req.path === "/api/auth/registro"
+    )
       message = "Ya existe una cuenta con ese correo.";
     else if (req.path.startsWith("/api/disciplinas"))
       message = "Ya existe una disciplina con ese nombre.";

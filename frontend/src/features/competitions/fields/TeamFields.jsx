@@ -1,4 +1,4 @@
-import { nameOf } from "../config.js";
+import { MemberPicker } from "../../teams/MemberPicker.jsx";
 // Composición y referencias condicionales de equipos deportivos o tecnológicos.
 export function TeamFields({
   select,
@@ -9,24 +9,41 @@ export function TeamFields({
   catalogs,
   discipline,
   hack,
-  set,
+  user,
+  members,
+  onMembersChange,
+  busy,
 }) {
+  const self = user.rol === "participante";
+  const profile = !item && self ? catalogs.miFicha : null;
+  const sports = form.tipo === "deportivo";
   return (
     <>
       {select("tipo", "Tipo de equipo", ["deportivo", "tecnologico"], {
         disabled: Boolean(item),
       })}
-      {select(
-        "responsable",
-        "Responsable del equipo",
-        available(owners, "responsable"),
-      )}
-      {form.tipo === "deportivo" ? (
+      {!self &&
+        select(
+          "responsable",
+          "Responsable del equipo",
+          available(owners, "responsable"),
+        )}
+      {sports ? (
         <>
-          {select(
-            "institucion",
-            "Institución",
-            available(catalogs.instituciones, "institucion"),
+          {profile ? (
+            <p className="form-help">
+              Institución ·{" "}
+              {
+                catalogs.instituciones.find((i) => i.id === profile.institucion)
+                  ?.nombre
+              }
+            </p>
+          ) : (
+            select(
+              "institucion",
+              "Institución",
+              available(catalogs.instituciones, "institucion"),
+            )
           )}
           {select(
             "disciplina",
@@ -66,36 +83,18 @@ export function TeamFields({
           </p>
         </>
       )}
-      <fieldset className="form-section">
-        <legend>Integrantes ({form.integrantes.length})</legend>
-        <div className="member-options">
-          {catalogs.participantes
-            .filter(
-              (p) => p.estado === "activo" || form.integrantes.includes(p.id),
-            )
-            .map((p) => (
-              <label key={p.id} className="check-label">
-                <input
-                  type="checkbox"
-                  checked={form.integrantes.includes(p.id)}
-                  onChange={(e) =>
-                    set(
-                      "integrantes",
-                      e.target.checked
-                        ? [...form.integrantes, p.id]
-                        : form.integrantes.filter((id) => id !== p.id),
-                    )
-                  }
-                />
-                {p.nombre}
-                <small>{nameOf(catalogs.instituciones, p.institucion)}</small>
-              </label>
-            ))}
-          {!catalogs.participantes.length && (
-            <p>Registra los participantes antes de agregar integrantes.</p>
-          )}
-        </div>
-      </fieldset>
+      <MemberPicker
+        key={sports ? form.institucion : form.hackaton}
+        members={members}
+        onChange={onMembersChange}
+        institutions={catalogs.instituciones}
+        institution={sports ? form.institucion : ""}
+        needsInstitution={sports}
+        selfId={profile?.id}
+        max={!sports && hack ? hack.integrantesMax : 100}
+        min={sports ? undefined : hack?.integrantesMin}
+        disabled={busy}
+      />
     </>
   );
 }

@@ -28,13 +28,39 @@ export function ResourceForm({
   onLogout,
 }) {
   const dialog = useRef(null);
-  const [form, setForm] = useState(() => initial(type, item, user));
+  const ownProfile =
+    type === "equipos" && !item && user.rol === "participante"
+      ? catalogs.miFicha
+      : null;
+  const [form, setForm] = useState(() => ({
+    ...initial(type, item, user),
+    ...(ownProfile ? { institucion: ownProfile.institucion } : {}),
+  }));
+  const [members, setMembers] = useState(() =>
+    ownProfile
+      ? [ownProfile]
+      : (item?.integrantes || []).map(
+          (id) =>
+            (item.integrantesDetalle || catalogs.participantes).find(
+              (person) => person.id === id,
+            ) || { id, nombre: "Integrante registrado" },
+        ),
+  );
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   useEffect(() => {
     dialog.current.showModal();
   }, []);
-  const set = (key, value) =>
+  const set = (key, value) => {
+    if (type === "equipos" && (key === "tipo" || key === "institucion")) {
+      setMembers((current) =>
+        key === "tipo"
+          ? ownProfile
+            ? [ownProfile]
+            : []
+          : current.filter((person) => person.institucion === value),
+      );
+    }
     setForm((old) => {
       const next = { ...old, [key]: value };
       if (key === "disciplina")
@@ -47,7 +73,8 @@ export function ResourceForm({
       if (key === "hackaton") next.categoriaTecnologica = "";
       if (key === "tipo" && type === "equipos")
         Object.assign(next, {
-          institucion: "",
+          institucion:
+            value === "deportivo" ? ownProfile?.institucion || "" : "",
           disciplina: "",
           categoria: "",
           modalidad: "",
@@ -70,6 +97,7 @@ export function ResourceForm({
       }
       return next;
     });
+  };
   const rule = (key, value) =>
     setForm((old) => ({
       ...old,
@@ -154,6 +182,7 @@ export function ResourceForm({
       for (const key of dateFields)
         if (body[key]) body[key] = new Date(body[key]).toISOString();
       if (type === "equipos") {
+        body.integrantes = members.map((person) => person.id);
         const omit =
           body.tipo === "deportivo"
             ? ["hackaton", "categoriaTecnologica"]
@@ -204,9 +233,11 @@ export function ResourceForm({
         {singular[type]}
       </h2>
       <p>
-        {type === "inscripciones"
-          ? "La plataforma comprobará requisitos, fechas y disponibilidad antes de confirmar."
-          : "Completa los datos. Los campos y relaciones se validan al guardar."}
+        {type === "equipos"
+          ? "Elige los datos del equipo y agrega a tus compañeros por nombre."
+          : type === "inscripciones"
+            ? "La plataforma comprobará requisitos, fechas y disponibilidad antes de confirmar."
+            : "Completa los datos. Los campos y relaciones se validan al guardar."}
       </p>
       <form onSubmit={submit}>
         {type !== "inscripciones" &&
@@ -225,6 +256,9 @@ export function ResourceForm({
             field={field}
             owners={owners}
             rule={rule}
+            onLocationChange={(location) =>
+              setForm((old) => ({ ...old, ...location }))
+            }
           />
         )}
         {type === "participantes" && (
@@ -245,7 +279,10 @@ export function ResourceForm({
             catalogs={catalogs}
             discipline={discipline}
             hack={hack}
-            set={set}
+            user={user}
+            members={members}
+            onMembersChange={setMembers}
+            busy={busy}
           />
         )}
         {type === "inscripciones" && (
@@ -257,6 +294,7 @@ export function ResourceForm({
           />
         )}
         {["disciplinas", "participantes", "equipos"].includes(type) &&
+          !(type === "equipos" && !item && user.rol === "participante") &&
           select("estado", "Estado", ["activo", "inactivo"])}
 
         {["torneos", "hackatones"].includes(type) && (

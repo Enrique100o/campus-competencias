@@ -72,12 +72,19 @@ export function Workspace({ user, onLogout, onUserChanged }) {
   const [view, setView] = useState(
       user.rol === "jurado" ? "proyectos" : "torneos",
     ),
+    [registrationKind, setRegistrationKind] = useState("deportiva"),
     [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const visible = navigation.filter(
     (item) => !item.roles || item.roles.includes(user.rol),
   );
+  if (user.rol === "participante") {
+    const priorities = ["torneos", "hackatones", "inscripciones", "equipos"];
+    const order = (key) =>
+      priorities.includes(key) ? priorities.indexOf(key) : priorities.length;
+    visible.sort((left, right) => order(left.key) - order(right.key));
+  }
   const selected =
     visible.find((item) => item.key === view) ||
     visible.find((item) => item.key === "perfil");
@@ -118,10 +125,28 @@ export function Workspace({ user, onLogout, onUserChanged }) {
     if (key === "agenda") return <SportsPanel user={user} />;
     if (key === "proyectos") return <HackathonPanel user={user} />;
     if (key === "inscripciones")
-      return <RegistrationsPanel user={user} onLogout={onLogout} />;
+      return (
+        <RegistrationsPanel
+          user={user}
+          onLogout={onLogout}
+          initialKind={registrationKind}
+          onExplore={(type) => setView(type)}
+        />
+      );
     if (key === "historial") return <AuditPanel />;
     return (
-      <ResourcePanel key={key} type={key} user={user} onLogout={onLogout} />
+      <ResourcePanel
+        key={key}
+        type={key}
+        user={user}
+        onLogout={onLogout}
+        onViewRegistrations={() => {
+          setRegistrationKind(
+            key === "hackatones" ? "tecnologica" : "deportiva",
+          );
+          setView("inscripciones");
+        }}
+      />
     );
   }
   return (
@@ -147,7 +172,11 @@ export function Workspace({ user, onLogout, onUserChanged }) {
               }}
             >
               <Icon size={19} />
-              <span>{title}</span>
+              <span>
+                {key === "inscripciones" && user.rol === "participante"
+                  ? "Mis inscripciones"
+                  : title}
+              </span>
             </button>
           ))}
         </nav>
@@ -179,7 +208,11 @@ export function Workspace({ user, onLogout, onUserChanged }) {
             </button>
             <span>Campus</span>
             <ChevronRight size={14} />
-            <strong>{selected.title}</strong>
+            <strong>
+              {selected.key === "inscripciones" && user.rol === "participante"
+                ? "Mis inscripciones"
+                : selected.title}
+            </strong>
           </div>
           <div className="topbar-right">
             <span className="access-label">

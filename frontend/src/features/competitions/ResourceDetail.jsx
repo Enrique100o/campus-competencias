@@ -9,7 +9,14 @@ import {
   eventStatus,
 } from "./config.js";
 // Detalle de solo lectura, incluyendo la versión del reglamento y la plantilla confirmada.
-export function ResourceDetail({ type, item, catalogs, onClose }) {
+export function ResourceDetail({
+  type,
+  item,
+  catalogs,
+  onClose,
+  onRegister,
+  registrationLabel,
+}) {
   const ref = useRef(null);
   useEffect(() => {
     ref.current.showModal();
@@ -85,8 +92,8 @@ export function ResourceDetail({ type, item, catalogs, onClose }) {
             {row(
               "Cupos",
               type === "torneos"
-                ? `${item.inscritos} confirmadas / ${item.cupos} inscripciones`
-                : `${item.cupos} equipos`,
+                ? `${item.inscritos} ocupados de ${item.cupos}`
+                : `${item.inscritos} equipos inscritos de ${item.cupos}`,
             )}
             {type === "hackatones" && (
               <>
@@ -147,7 +154,9 @@ export function ResourceDetail({ type, item, catalogs, onClose }) {
             {row(
               "Integrantes",
               item.integrantes
-                .map((id) => nameOf(catalogs.participantes, id))
+                .map((id) =>
+                  nameOf(item.integrantesDetalle || catalogs.participantes, id),
+                )
                 .join(", ") || "Sin integrantes",
             )}
           </>
@@ -205,9 +214,21 @@ export function ResourceDetail({ type, item, catalogs, onClose }) {
         </section>
       )}
       <div className="dialog-actions">
-        <button className="button button-secondary" onClick={onClose}>
+        <button
+          type="button"
+          className="button button-secondary"
+          onClick={onClose}
+        >
           Cerrar detalle
         </button>
+        {onRegister && (
+          <button
+            className="button button-primary"
+            onClick={() => onRegister(item)}
+          >
+            {registrationLabel}
+          </button>
+        )}
       </div>
     </dialog>
   );

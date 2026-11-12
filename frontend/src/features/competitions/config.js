@@ -69,6 +69,7 @@ const catalogsEmpty = {
   equipos: [],
   torneos: [],
   hackatones: [],
+  miFicha: null,
 };
 const fields = {
   disciplinas: ["nombre", "modalidades", "formatos", "categorias", "estado"],
@@ -194,6 +195,22 @@ const readableDate = (value) =>
     : "Sin fecha";
 const nameOf = (list, id) =>
   list.find((item) => item.id === id)?.nombre || "Registro no disponible";
+export function registrationWindowOpen(item, now = Date.now()) {
+  return (
+    item.estado === "inscripciones" &&
+    now >= Date.parse(item.inscripcionInicio) &&
+    now <= Date.parse(item.inscripcionFin)
+  );
+}
+
+export function canRegisterForEvent(item, user) {
+  return (
+    canCreate("inscripciones", user) &&
+    registrationWindowOpen(item) &&
+    (item.inscritos ?? 0) < item.cupos
+  );
+}
+
 function eventStatus(item) {
   if (item.estado !== "inscripciones") return labels[item.estado];
   const now = Date.now();
@@ -201,7 +218,9 @@ function eventStatus(item) {
     ? "Inscripciones próximas"
     : now > Date.parse(item.inscripcionFin)
       ? "Inscripciones cerradas"
-      : "Inscripciones abiertas";
+      : item.inscritos >= item.cupos
+        ? "Cupos agotados"
+        : "Inscripciones abiertas";
 }
 function canEdit(type, item, user) {
   if (user.rol === "administrador") return true;

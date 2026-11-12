@@ -7,6 +7,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { api } from "../../api.js";
+import { ParticipantProfileCard } from "../registrations/ParticipantProfileCard.jsx";
 
 const roles = {
   administrador: "Administrador",
@@ -204,6 +205,7 @@ export function ProfilePanel({ user, onUserChanged, onLogout }) {
           </div>
         )}
       </section>
+      {user.rol === "participante" && <ParticipantProfileCard />}
     </>
   );
 }

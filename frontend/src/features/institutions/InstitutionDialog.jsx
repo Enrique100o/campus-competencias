@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Building2, Check, LoaderCircle, ShieldCheck, X } from "lucide-react";
 import { api } from "../../api.js";
 import { Notice as ErrorNotice } from "../../components/ui/Fields.jsx";
+import { LocationFields } from "../../components/ui/LocationFields.jsx";
 import { types, blankInstitution } from "./config.js";
 // Alta y edición completa con PUT; el estado inactivo conserva relaciones históricas.
 export function InstitutionDialog({ institution, onClose, onSaved }) {
@@ -83,32 +84,12 @@ export function InstitutionDialog({ institution, onClose, onSaved }) {
             placeholder="Ej. Universidad del Norte"
           />
         </label>
-        <div className="form-row">
-          <label>
-            Ciudad/municipio
-            <input
-              name="ciudad"
-              value={form.ciudad}
-              onChange={update}
-              required
-              minLength={2}
-              maxLength={100}
-              placeholder="Ej. Barranquilla"
-            />
-          </label>
-          <label>
-            Departamento
-            <input
-              name="departamento"
-              value={form.departamento}
-              onChange={update}
-              required
-              minLength={2}
-              maxLength={100}
-              placeholder="Ej. Atlántico"
-            />
-          </label>
-        </div>
+        <LocationFields
+          departamento={form.departamento}
+          ciudad={form.ciudad}
+          onChange={(location) => setForm((old) => ({ ...old, ...location }))}
+          disabled={busy}
+        />
         <div className="form-row">
           <label>
             Tipo de institución

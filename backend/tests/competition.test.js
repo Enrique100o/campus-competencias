@@ -211,6 +211,89 @@ describe("Competencias: flujos y reglas con MongoDB real", () => {
     await mongoose.disconnect();
   });
 
+  it("permite crear una cuenta y completar la ficha propia antes de inscribirse", async () => {
+    const agent = request.agent(app);
+    const account = {
+      nombre: "Nueva participante",
+      correo: "nueva@example.test",
+      password,
+    };
+    await agent
+      .post("/api/auth/registro")
+      .send({ ...account, rol: "administrador" })
+      .expect(400);
+    const {
+      body: { data: session },
+    } = await agent.post("/api/auth/registro").send(account).expect(201);
+    assert.equal(session.user.rol, "participante");
+    assert.equal(session.user.passwordHash, undefined);
+    const duplicate = await agent
+      .post("/api/auth/registro")
+      .send(account)
+      .expect(409);
+    assert.match(duplicate.body.error.message, /cuenta con ese correo/);
+    await agent.get("/api/usuarios").expect(403);
+    const actor = { agent, user: session.user, csrf: session.csrfToken };
+    const profile = {
+      documento: "QA-NUEVA",
+      nacimiento: "2005-06-01",
+      genero: "femenino",
+      institucion: institution.id,
+    };
+    await agent.post("/api/participantes/mi-ficha").send(profile).expect(403);
+    await write(actor, "post", "participantes/mi-ficha", {
+      ...profile,
+      usuario: accounts[0].id,
+    }).expect(400);
+    const own = await create("participantes/mi-ficha", profile, actor);
+    assert.equal(own.usuario, session.user.id);
+    assert.equal(own.nombre, session.user.nombre);
+    await write(actor, "post", "participantes/mi-ficha", {
+      ...profile,
+      documento: "QA-OTRO",
+    }).expect(409);
+    const event = await open(
+      tournament({
+        unidadInscripcion: "individual",
+        formato: "pruebas",
+        requiereAprobacion: true,
+      }),
+    );
+    const entry = await create(
+      "inscripciones",
+      {
+        torneo: event.id,
+        modalidad: "individual",
+        competidor: own.id,
+        prueba: "100 metros",
+      },
+      actor,
+    );
+    assert.equal(entry.estado, "pendiente");
+    const mine = await agent
+      .get(`/api/inscripciones?torneo=${event.id}`)
+      .expect(200);
+    assert.deepEqual(
+      mine.body.data.items.map((item) => item.id),
+      [entry.id],
+    );
+  });
+
+  it("filtra por plazo de inscripción, aparte de la etapa del evento", async () => {
+    const event = await open(tournament({ nombre: "Torneo abierto" }));
+    await open(
+      tournament({ nombre: "Torneo próximo", inscripcionInicio: date(2) }),
+    );
+    const actor = await login(accounts[0]);
+    const response = await actor.agent
+      .get("/api/torneos?q=Torneo&ventana=abierta")
+      .expect(200);
+    assert.deepEqual(
+      response.body.data.items.map((item) => item.id),
+      [event.id],
+    );
+  });
+
   it("configura disciplinas, rechaza incoherencias y protege categorías utilizadas", async () => {
     const actor = await login(organizer);
     await write(actor, "post", "disciplinas", {
@@ -308,7 +391,12 @@ describe("Competencias: flujos y reglas con MongoDB real", () => {
       ...body,
       integrantes: [people[0].id],
     }).expect(400);
-    const created = await create("equipos", body, representative);
+    const created = await create(
+      "equipos",
+      { ...body, integrantes: [people[1].id] },
+      representative,
+    );
+    assert.deepEqual(created.integrantes, [people[0].id, people[1].id]);
     assert.equal(created.disciplina, undefined);
     await write(representative, "patch", `equipos/${created.id}`, {
       nombre: "Ideas actualizadas",
@@ -324,6 +412,53 @@ describe("Competencias: flujos y reglas con MongoDB real", () => {
           .expect(200)
       ).body.data.total,
       1,
+    );
+  });
+
+  it("busca integrantes activos por nombre e institución fuera del catálogo inicial", async () => {
+    const candidate = people[1];
+    await Participant.updateOne(
+      { _id: candidate.id },
+      { nombre: "ZZ Compañera única" },
+    );
+    // Los registros anteriores al nombre buscado llenan el catálogo de 500 filas.
+    await Participant.collection.insertMany(
+      Array.from({ length: 500 }, (_, index) => ({
+        nombre: "A Estudiante " + index,
+        documento: "MAS-" + index,
+        usuario: new mongoose.Types.ObjectId(),
+        institucion: new mongoose.Types.ObjectId(institution.id),
+        estado: "activo",
+      })),
+    );
+    const actor = await login(accounts[0]);
+    const catalog = (await actor.agent.get("/api/catalogos").expect(200)).body
+      .data;
+    assert.equal(catalog.miFicha.id, people[0].id);
+    assert.equal(
+      catalog.participantes.some((person) => person.id === candidate.id),
+      false,
+    );
+    const query = new URLSearchParams({
+      q: "Compañera",
+      institucion: institution.id,
+    });
+    const response = await actor.agent
+      .get("/api/equipos/integrantes?" + query)
+      .expect(200);
+    assert.deepEqual(response.body.data, [
+      {
+        id: candidate.id,
+        nombre: "ZZ Compañera única",
+        institucion: institution.id,
+        institucionNombre: institution.nombre,
+      },
+    ]);
+    query.set("institucion", String(new mongoose.Types.ObjectId()));
+    assert.deepEqual(
+      (await actor.agent.get("/api/equipos/integrantes?" + query).expect(200))
+        .body.data,
+      [],
     );
   });
 

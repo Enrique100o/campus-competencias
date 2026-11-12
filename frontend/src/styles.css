@@ -248,22 +248,6 @@ svg {
   border-radius: 30px;
   color: #d4decf;
 }
-.auth-story-footer {
-  position: relative;
-  z-index: 1;
-  color: #afc3aa;
-  font-size: 11px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.status-dot {
-  width: 6px;
-  height: 6px;
-  background: #bdd88a;
-  border-radius: 50%;
-  display: inline-block;
-}
 .auth-orbit {
   position: absolute;
   border: 1px solid #9cad8020;
@@ -331,14 +315,61 @@ svg {
   justify-content: space-between;
   padding: 13px 18px;
 }
-.auth-note {
-  display: flex;
-  gap: 7px;
-  justify-content: center;
-  align-items: center;
-  font-size: 10px;
-  color: #8a9487;
-  margin-top: 23px;
+.auth-switch {
+  display: grid;
+  gap: 10px;
+  text-align: center;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+.auth-switch .button {
+  min-height: 44px;
+}
+.signup-steps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  list-style: none;
+  gap: 8px;
+  padding: 0;
+  margin: 0 0 20px;
+}
+.signup-steps li {
+  background: #edf0eb;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+}
+.signup-steps [aria-current="step"] {
+  background: #e1edda;
+  color: var(--dark);
+  font-weight: 700;
+}
+.signup-fields {
+  display: grid;
+  gap: 16px;
+}
+.signup-email {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.password-field {
+  position: relative;
+}
+.password-field input {
+  padding-right: 48px;
+}
+.password-field .icon-button {
+  position: absolute;
+  bottom: 4px;
+  right: 5px;
+}
+.signup-actions {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
 }
 .auth-bottom {
   position: absolute;
@@ -1673,6 +1704,67 @@ fieldset:disabled {
   font-size: 10px;
   margin-left: auto;
 }
+.member-picker .form-help {
+  color: #52624f;
+  font-size: 13px;
+}
+.member-picker .form-help svg {
+  vertical-align: middle;
+}
+.member-selection,
+.member-results {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.member-selection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.member-selection li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border-radius: 9px;
+  background: #e8f0df;
+  color: var(--dark);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.member-selection .icon-button {
+  width: 29px;
+  height: 29px;
+}
+.member-results {
+  display: grid;
+  gap: 6px;
+}
+.member-results li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.member-results li > span {
+  display: grid;
+  gap: 3px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.member-results small {
+  color: #52624f;
+}
+.member-results .button {
+  flex-shrink: 0;
+  min-height: 40px;
+}
 .resource-summary {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1768,17 +1860,28 @@ fieldset:disabled {
   overflow-wrap: anywhere;
 }
 .event-card > p {
-  font-size: 12px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 14px;
   line-height: 1.7;
-  color: #8e9986;
+  color: #52624f;
 }
 .event-meta {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 11px;
-  color: #6e8162;
+  font-size: 13px;
+  color: #52624f;
   margin-top: auto;
+}
+.event-meta > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 .event-actions {
   border-top: 1px solid #e8eddf;
@@ -1789,9 +1892,39 @@ fieldset:disabled {
   flex-wrap: wrap;
 }
 .event-actions .button {
-  font-size: 10px;
-  min-height: 35px;
-  padding: 8px 10px;
+  font-size: 13px;
+  min-height: 44px;
+  padding: 10px 12px;
+}
+.registration-event {
+  display: grid;
+  gap: 7px;
+  border-radius: 10px;
+  background: #f0f4eb;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.registration-event p,
+.registration-success p {
+  color: #52624f;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.registration-success {
+  display: grid;
+  gap: 10px;
+}
+.registration-success > svg {
+  color: var(--green);
+}
+.resource-dialog .form-hint {
+  color: #43533d;
+  font-size: 13px;
+}
+.participant-profile-card {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
 }
 .resource-details {
   margin: 0;
@@ -1836,9 +1969,6 @@ fieldset:disabled {
 @media (max-width: 1100px) {
   .event-grid {
     grid-template-columns: 1fr;
-  }
-  .event-actions .button {
-    font-size: 11px;
   }
 }
 @media (max-width: 600px) {

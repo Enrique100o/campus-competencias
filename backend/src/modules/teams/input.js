@@ -5,6 +5,7 @@ import {
   Discipline,
   Tournament,
   Hackathon,
+  Participant,
   Registration,
 } from "../../competition-models.js";
 import { ApiError, formFields, normalize, text } from "../../validation.js";
@@ -58,6 +59,23 @@ export async function teamInput(body, user, previous) {
     );
   if (!Array.isArray(body.integrantes || []))
     throw new ApiError(400, "Revisa los integrantes del equipo.");
+  let roster = body.integrantes || [];
+  if (!previous && user.rol === "participante") {
+    const profile = await Participant.findOne({
+      usuario: user._id,
+      estado: "activo",
+    });
+    if (!profile)
+      throw new ApiError(
+        409,
+        "Completa tu ficha de participante para crear un equipo.",
+        "PROFILE_REQUIRED",
+      );
+    const ownId = String(profile._id);
+    const ids = roster.map((value) => id(value, "integrante"));
+    // Agrega al creador una sola vez, conservando la validación de duplicados.
+    roster = ids.includes(ownId) ? ids : [ownId, ...ids];
+  }
   const sameRoster =
     previous &&
     JSON.stringify(previous.integrantes.map(String).sort()) ===
@@ -73,7 +91,7 @@ export async function teamInput(body, user, previous) {
       "categoriaTecnologica",
     ].every((key) => String(previous[key] || "") === String(body[key] || ""));
   const validateEligibility = !sameRoster || !sameReferences;
-  const people = await members(body.integrantes || [], validateEligibility);
+  const people = await members(roster, validateEligibility);
   const data = {
     nombre: text(body.nombre, "nombre", 120, 2),
     tipo,

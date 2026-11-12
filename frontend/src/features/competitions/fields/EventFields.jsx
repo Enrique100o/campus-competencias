@@ -1,5 +1,6 @@
 import { SportsRuleFields } from "./SportsRuleFields.jsx";
 import { TextArea } from "../../../components/ui/Fields.jsx";
+import { LocationFields } from "../../../components/ui/LocationFields.jsx";
 
 // Datos generales, ventanas y reglas de torneos y hackatones.
 export function EventFields({
@@ -14,11 +15,18 @@ export function EventFields({
   field,
   owners,
   rule,
+  onLocationChange,
 }) {
   return (
     <>
       <TextArea
-        label="Descripción"
+        label={
+          type === "torneos"
+            ? "Descripción breve (opcional)"
+            : "Descripción breve"
+        }
+        placeholder="En una o dos frases, cuenta de qué trata el evento y a quién va dirigido."
+        rows={2}
         value={form.descripcion}
         onChange={(v) => set("descripcion", v)}
         required={type === "hackatones"}
@@ -62,10 +70,11 @@ export function EventFields({
           "hibrida",
         ])
       )}
-      <div className="form-row">
-        {field("ciudad", "Ciudad/municipio", { minLength: 2 })}
-        {field("departamento", "Departamento", { minLength: 2 })}
-      </div>
+      <LocationFields
+        departamento={form.departamento}
+        ciudad={form.ciudad}
+        onChange={onLocationChange}
+      />
       <fieldset className="form-section">
         <legend>Fechas y ventanas</legend>
         <div className="form-row">

@@ -39,6 +39,7 @@ export async function api(path, options = {}) {
     result.response.status === 401 &&
     ![
       "/auth/login",
+      "/auth/registro",
       "/auth/logout",
       "/auth/refresh",
       "/setup/administrador",

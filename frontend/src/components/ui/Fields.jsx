@@ -38,18 +38,20 @@ function Select({
   onChange,
   options,
   required = true,
+  placeholder = "Selecciona una opción",
   ...props
 }) {
   return (
     <label>
       {label}
       <select
+        aria-label={label}
         value={value || ""}
         onChange={(event) => onChange(event.target.value)}
         required={required}
         {...props}
       >
-        <option value="">Selecciona una opción</option>
+        <option value="">{placeholder}</option>
         {options.map((item) => (
           <option
             key={item.id ?? item}

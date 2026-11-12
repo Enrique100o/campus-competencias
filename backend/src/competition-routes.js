@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { Types } from "mongoose";
 import { User, Institution } from "./models.js";
 import {
   Discipline,
@@ -33,6 +34,7 @@ import { teamInput } from "./modules/teams/input.js";
 import { registerCompetitor } from "./modules/registrations/sports.js";
 import { changeStage } from "./modules/events/service.js";
 import { audit } from "./modules/workflow/common.js";
+import { HackRegistration } from "./modules/workflow/models.js";
 
 const fields = {
   disciplinas: ["nombre", "modalidades", "formatos", "categorias", "estado"],
@@ -240,11 +242,23 @@ async function enriched(type, record) {
     data.usuarioNombre,
     data.hackatonNombre,
   ] = names;
-  if (type === "torneos")
-    data.inscritos = await Registration.countDocuments({
-      torneo: record._id,
+  if (type === "equipos") {
+    data.integrantesDetalle = resourceJSON(
+      await Participant.find({ _id: { $in: record.integrantes } })
+        .select("nombre institucion")
+        .lean(),
+    );
+  }
+  if (["torneos", "hackatones"].includes(type)) {
+    const [RegistrationModel, key] =
+      type === "torneos"
+        ? [Registration, "torneo"]
+        : [HackRegistration, "hackaton"];
+    data.inscritos = await RegistrationModel.countDocuments({
+      [key]: record._id,
       estado: { $in: ["pendiente", "confirmada"] },
     });
+  }
   return data;
 }
 
@@ -262,6 +276,7 @@ export function competitionRouter(authenticated) {
       equipos,
       hackatones,
       torneos,
+      miFicha,
     ] = await Promise.all([
       Institution.find({})
         .select("nombre estado ciudad")
@@ -285,7 +300,7 @@ export function competitionRouter(authenticated) {
         ? []
         : Team.find({})
             .select(
-              "nombre tipo estado responsable disciplina categoria modalidad institucion integrantes",
+              "nombre tipo estado responsable disciplina categoria modalidad institucion integrantes hackaton",
             )
             .sort({ nombre: 1 })
             .limit(500)
@@ -298,6 +313,11 @@ export function competitionRouter(authenticated) {
         .sort({ nombre: 1 })
         .limit(500)
         .lean(),
+      req.user.rol === "participante"
+        ? Participant.findOne({ usuario: req.user._id })
+            .select("nombre institucion estado usuario")
+            .lean()
+        : null,
     ]);
     res.json({
       data: resourceJSON({
@@ -308,8 +328,80 @@ export function competitionRouter(authenticated) {
         equipos,
         hackatones,
         torneos,
+        miFicha,
       }),
     });
+  });
+
+  router.post("/participantes/mi-ficha", requireCsrf, async (req, res) => {
+    const record = await competitionWrite(async () => {
+      await refreshActor(req);
+      requireRoles(req.user, ["participante"]);
+      formFields(req.body, [
+        "documento",
+        "nacimiento",
+        "genero",
+        "institucion",
+      ]);
+      // La cuenta, el nombre y el estado de la ficha se asignan en el servidor.
+      const input = await participantInput({
+        ...req.body,
+        usuario: String(req.user._id),
+        nombre: req.user.nombre,
+        categoria: "General",
+        estado: "activo",
+      });
+      return Participant.create({ ...input, creadoPor: req.user._id });
+    });
+    res.status(201).json({ data: await enriched("participantes", record) });
+  });
+
+  router.get("/equipos/integrantes", async (req, res) => {
+    mayCreate("equipos", req.user);
+    const search = escapedSearch(req.query.q);
+    if (search.length < 2) return res.json({ data: [] });
+    const filter = {
+      nombre: { $regex: search, $options: "i" },
+      estado: "activo",
+      ...(req.query.institucion
+        ? {
+            institucion: new Types.ObjectId(
+              id(req.query.institucion, "institución"),
+            ),
+          }
+        : {}),
+    };
+    // Solo devuelve los datos que sirven para identificar al compañero.
+    const people = await Participant.aggregate([
+      { $match: filter },
+      {
+        $lookup: {
+          from: "usuarios",
+          localField: "usuario",
+          foreignField: "_id",
+          as: "cuenta",
+        },
+      },
+      {
+        $lookup: {
+          from: "instituciones",
+          localField: "institucion",
+          foreignField: "_id",
+          as: "centro",
+        },
+      },
+      { $match: { "cuenta.estado": "activo", "centro.estado": "activo" } },
+      { $sort: { nombre: 1, _id: 1 } },
+      { $limit: 12 },
+      {
+        $project: {
+          nombre: 1,
+          institucion: 1,
+          institucionNombre: { $first: "$centro.nombre" },
+        },
+      },
+    ]);
+    res.json({ data: resourceJSON(people) });
   });
 
   for (const [type, Model] of Object.entries(models)) {
@@ -326,6 +418,17 @@ export function competitionRouter(authenticated) {
               : ["descripcion"]),
           ].map((field) => ({ [field]: { $regex: search, $options: "i" } })),
         });
+      if (
+        req.query.ventana === "abierta" &&
+        ["torneos", "hackatones"].includes(type)
+      ) {
+        const now = new Date();
+        filters.push({
+          estado: "inscripciones",
+          inscripcionInicio: { $lte: now },
+          inscripcionFin: { $gte: now },
+        });
+      }
       if (req.query.estado) {
         const allowed =
           type === "torneos"

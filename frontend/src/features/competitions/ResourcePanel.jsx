@@ -13,21 +13,25 @@ import {
 } from "lucide-react";
 import { api } from "../../api.js";
 import { Notice } from "../../components/ui/Fields.jsx";
+import { Modal } from "../../components/ui/Modal.jsx";
+import { useAction } from "../../components/ui/Workflow.jsx";
 import {
   resourceNames,
   singular,
   labels,
   empty,
   catalogsEmpty,
-  readableDate,
-  eventStatus,
+  canRegisterForEvent,
   canEdit,
   canCreate,
 } from "./config.js";
 import { ResourceForm } from "./ResourceForm.jsx";
 import { ResourceDetail } from "./ResourceDetail.jsx";
+import { EventCard } from "./EventCard.jsx";
+import { EventSignupDialog } from "../registrations/EventSignupDialog.jsx";
+import { ParticipantProfileForm } from "../registrations/ParticipantProfileForm.jsx";
 // Listado con filtros, paginación y acciones autorizadas de cada catálogo.
-export function ResourcePanel({ type, user, onLogout }) {
+export function ResourcePanel({ type, user, onLogout, onViewRegistrations }) {
   const [data, setData] = useState(empty),
     [catalogs, setCatalogs] = useState(catalogsEmpty);
   const [query, setQuery] = useState(""),
@@ -40,6 +44,8 @@ export function ResourcePanel({ type, user, onLogout }) {
     [error, setError] = useState(""),
     [form, setForm] = useState(null),
     [detail, setDetail] = useState(null),
+    [registrationEvent, setRegistrationEvent] = useState(null),
+    [completingProfile, setCompletingProfile] = useState(false),
     [toast, setToast] = useState(""),
     [publishing, setPublishing] = useState("");
   useEffect(() => {
@@ -88,10 +94,32 @@ export function ResourcePanel({ type, user, onLogout }) {
     setFilters((old) => ({ ...old, [key]: value }));
     setPage(1);
   };
+  const profileAction = useAction((profile) => {
+    setCatalogs((current) => ({ ...current, miFicha: profile }));
+    setCompletingProfile(false);
+    setForm({ item: null });
+  });
+  function createResource() {
+    if (type === "equipos" && user.rol === "participante") {
+      if (!catalogs.miFicha) {
+        setCompletingProfile(true);
+        return;
+      }
+      if (catalogs.miFicha.estado !== "activo") {
+        setToast("Tu ficha está inactiva. Consulta con la organización.");
+        return;
+      }
+    }
+    setForm({ item: null });
+  }
   function saved(message) {
     setForm(null);
     setToast(message);
     setRefresh((v) => v + 1);
+  }
+  function openRegistration(event) {
+    setDetail(null);
+    setRegistrationEvent(event);
   }
   async function publish(item) {
     setPublishing(item.id);
@@ -126,8 +154,8 @@ export function ResourcePanel({ type, user, onLogout }) {
     disciplinas:
       "Un catálogo para todos los deportes, con sus categorías y formatos.",
     torneos:
-      "Organiza competencias y consulta sus fechas, cupos y reglamentos.",
-    hackatones: "Innovación, equipos y requisitos en un espacio propio.",
+      "Busca un torneo, revisa sus requisitos e inscríbete desde su tarjeta.",
+    hackatones: "Encuentra un hackatón e inscribe a tu equipo.",
     participantes: "Personas, instituciones y datos necesarios para competir.",
     equipos:
       "Equipos deportivos y tecnológicos con sus responsables e integrantes.",
@@ -156,7 +184,7 @@ export function ResourcePanel({ type, user, onLogout }) {
           <button
             className="button button-primary"
             disabled={!catalogReady}
-            onClick={() => setForm({ item: null })}
+            onClick={createResource}
           >
             <Plus size={18} />
             {type === "inscripciones"
@@ -165,28 +193,30 @@ export function ResourcePanel({ type, user, onLogout }) {
           </button>
         )}
       </div>
-      <section className="resource-summary">
-        <div>
-          <Trophy size={23} />
-          <span>
-            {isEvent
-              ? "Eventos disponibles para tu cuenta"
-              : "Registros disponibles para tu cuenta"}
-            <strong>{loading ? "—" : data.summary.total}</strong>
-          </span>
-        </div>
-        <div>
-          <Check size={23} />
-          <span>
-            {isEvent
-              ? "En etapa de inscripciones"
-              : type === "inscripciones"
-                ? "Confirmadas"
-                : "Activos"}
-            <strong>{loading ? "—" : data.summary.active}</strong>
-          </span>
-        </div>
-      </section>
+      {!(isEvent && user.rol === "participante") && (
+        <section className="resource-summary">
+          <div>
+            <Trophy size={23} />
+            <span>
+              {isEvent
+                ? "Eventos disponibles para tu cuenta"
+                : "Registros disponibles para tu cuenta"}
+              <strong>{loading ? "—" : data.summary.total}</strong>
+            </span>
+          </div>
+          <div>
+            <Check size={23} />
+            <span>
+              {isEvent
+                ? "En etapa de inscripciones"
+                : type === "inscripciones"
+                  ? "Confirmadas"
+                  : "Activos"}
+              <strong>{loading ? "—" : data.summary.active}</strong>
+            </span>
+          </div>
+        </section>
+      )}
       <section className="directory-card">
         <div className="directory-title">
           <div>
@@ -197,7 +227,7 @@ export function ResourcePanel({ type, user, onLogout }) {
             </h2>
             <p>
               {isEvent
-                ? "Abre el detalle para conocer las condiciones de participación."
+                ? "Consulta las fechas y los cupos de cada evento."
                 : "Consulta la información y gestiona tus registros autorizados."}
             </p>
           </div>
@@ -209,8 +239,11 @@ export function ResourcePanel({ type, user, onLogout }) {
               <Search size={18} />
               <input
                 aria-label={`Buscar ${type}`}
-                placeholder="Buscar por nombre…"
+                placeholder={
+                  isEvent ? `Buscar ${type} por nombre…` : "Buscar por nombre…"
+                }
                 value={query}
+                maxLength={100}
                 onChange={(e) => setQuery(e.target.value)}
               />
             </label>
@@ -218,10 +251,21 @@ export function ResourcePanel({ type, user, onLogout }) {
           {type !== "inscripciones" && (
             <select
               aria-label="Filtrar por estado"
-              value={filters.estado || ""}
-              onChange={(e) => filter("estado", e.target.value)}
+              value={filters.ventana || filters.estado || ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFilters((old) => ({
+                  ...old,
+                  ventana: value === "abierta" ? value : "",
+                  estado: value === "abierta" ? "" : value,
+                }));
+                setPage(1);
+              }}
             >
               <option value="">Todos los estados</option>
+              {isEvent && (
+                <option value="abierta">En plazo de inscripción</option>
+              )}
               {states.map((s) => (
                 <option key={s} value={s}>
                   {labels[s]}
@@ -361,83 +405,44 @@ export function ResourcePanel({ type, user, onLogout }) {
         ) : !data.items.length ? (
           <div className="empty-state">
             <Trophy size={35} />
-            <h3>No hay registros para mostrar</h3>
+            <h3>
+              {isEvent
+                ? "No encontramos eventos"
+                : "No hay registros para mostrar"}
+            </h3>
             <p>
               {Object.values(filters).some(Boolean) || query
                 ? "Cambia la búsqueda o los filtros."
                 : "Los registros disponibles aparecerán aquí."}
             </p>
+            {(query || Object.values(filters).some(Boolean)) && (
+              <button
+                className="button button-secondary"
+                onClick={() => {
+                  setQuery("");
+                  setDebounced("");
+                  setFilters({});
+                  setPage(1);
+                }}
+              >
+                Limpiar búsqueda y filtros
+              </button>
+            )}
           </div>
         ) : isEvent ? (
           <div className="event-grid">
             {data.items.map((item) => (
-              <article className="event-card" key={item.id}>
-                <div className="event-card-top">
-                  <span className="event-symbol">
-                    <Trophy size={23} />
-                  </span>
-                  <span
-                    className={`badge ${item.estado === "inscripciones" ? "badge-active" : "badge-inactive"}`}
-                  >
-                    {eventStatus(item)}
-                  </span>
-                </div>
-                <span className="eyebrow">
-                  {type === "torneos"
-                    ? `${labels[item.tipo]} · ${item.disciplinaNombre}`
-                    : labels[item.modalidad]}
-                </span>
-                <h3>{item.nombre}</h3>
-                <p>
-                  {item.descripcion ||
-                    "Consulta los requisitos de este evento."}
-                </p>
-                <div className="event-meta">
-                  <span>
-                    {item.ciudad}, {item.departamento}
-                  </span>
-                  <span>Inicio: {readableDate(item.inicio)}</span>
-                  <span>
-                    {type === "torneos"
-                      ? `${item.inscritos} / ${item.cupos} inscripciones`
-                      : `${item.cupos} equipos · ${item.integrantesMin}–${item.integrantesMax} integrantes`}
-                  </span>
-                </div>
-                <div className="event-actions">
-                  <button
-                    className="button button-secondary"
-                    aria-label={`Ver ${item.nombre}`}
-                    onClick={() => setDetail(item)}
-                  >
-                    <Eye size={15} />
-                    Ver requisitos
-                  </button>
-                  {canEdit(type, item, user) && (
-                    <>
-                      <button
-                        className="icon-button edit-button"
-                        aria-label={`Editar ${item.nombre}`}
-                        onClick={() => setForm({ item })}
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      {item.estado === "borrador" && (
-                        <button
-                          className="button button-primary"
-                          disabled={Boolean(publishing)}
-                          onClick={() => publish(item)}
-                        >
-                          {publishing === item.id ? (
-                            <LoaderCircle size={15} className="spin" />
-                          ) : (
-                            "Abrir inscripciones"
-                          )}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </article>
+              <EventCard
+                key={item.id}
+                event={item}
+                type={type}
+                user={user}
+                publishing={publishing}
+                onDetails={setDetail}
+                onRegister={openRegistration}
+                onEdit={(event) => setForm({ item: event })}
+                onPublish={publish}
+              />
             ))}
           </div>
         ) : (
@@ -537,7 +542,47 @@ export function ResourcePanel({ type, user, onLogout }) {
           item={detail}
           catalogs={catalogs}
           onClose={() => setDetail(null)}
+          onRegister={
+            isEvent && canRegisterForEvent(detail, user)
+              ? openRegistration
+              : undefined
+          }
+          registrationLabel={
+            user.rol === "participante" ? "Inscribirme" : "Inscribir"
+          }
         />
+      )}
+      {registrationEvent && (
+        <EventSignupDialog
+          event={registrationEvent}
+          type={type}
+          user={user}
+          catalogs={catalogs}
+          onClose={() => {
+            setRegistrationEvent(null);
+            setRefresh((value) => value + 1);
+          }}
+          onViewRegistrations={onViewRegistrations}
+        />
+      )}
+      {completingProfile && (
+        <Modal
+          title="Tu ficha de participante"
+          busy={profileAction.busy}
+          onClose={() => setCompletingProfile(false)}
+        >
+          <ParticipantProfileForm
+            institutions={catalogs.instituciones.filter(
+              (institution) => institution.estado === "activo",
+            )}
+            busy={profileAction.busy}
+            error={profileAction.error}
+            onBack={() => setCompletingProfile(false)}
+            onSave={(body) =>
+              profileAction.run("/participantes/mi-ficha", "POST", body)
+            }
+          />
+        </Modal>
       )}
       {toast && (
         <div className="toast" role="status">

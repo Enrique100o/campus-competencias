@@ -14,8 +14,8 @@ import {
   stateLabel,
 } from "../../components/ui/Workflow.jsx";
 
-export function RegistrationsPanel({ user, onLogout }) {
-  const [kind, setKind] = useState("deportiva"),
+export function RegistrationsPanel({ user, onLogout, initialKind, onExplore }) {
+  const [kind, setKind] = useState(initialKind),
     [form, setForm] = useState(false),
     [hack, setHack] = useState(""),
     [team, setTeam] = useState(""),
@@ -40,9 +40,24 @@ export function RegistrationsPanel({ user, onLogout }) {
   return (
     <>
       <PageHeading
-        title="Inscripciones"
-        description="Solicitudes, confirmaciones y retiros con conservación del historial."
-      />
+        title={manager ? "Inscripciones" : "Mis inscripciones"}
+        description={
+          manager
+            ? "Revisa las solicitudes y gestiona las inscripciones de tus eventos."
+            : "Consulta si tu inscripción está confirmada o pendiente de aprobación."
+        }
+      >
+        {!manager && (
+          <button
+            className="button button-primary"
+            onClick={() =>
+              onExplore(kind === "deportiva" ? "torneos" : "hackatones")
+            }
+          >
+            {kind === "deportiva" ? "Buscar torneos" : "Buscar hackatones"}
+          </button>
+        )}
+      </PageHeading>
       <div className="workflow-tabs">
         <button
           className={kind === "deportiva" ? "active" : ""}
@@ -63,7 +78,7 @@ export function RegistrationsPanel({ user, onLogout }) {
           Hackatones
         </button>
       </div>
-      {kind === "deportiva" && (
+      {manager && kind === "deportiva" && (
         <ResourcePanel type="inscripciones" user={user} onLogout={onLogout} />
       )}
       <section className="directory-card">
@@ -79,7 +94,7 @@ export function RegistrationsPanel({ user, onLogout }) {
                 : hacks.data?.items || []
             }
           />
-          {kind === "tecnologica" && (
+          {manager && kind === "tecnologica" && (
             <button
               className="button button-primary"
               onClick={() => setForm(true)}

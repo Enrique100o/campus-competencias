@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { User } from "../../models.js";
-import { credentials, ApiError } from "../../validation.js";
+import { credentials, formFields, ApiError } from "../../validation.js";
 import {
   authLimiter,
   createSession,
@@ -60,6 +60,26 @@ export function authRouter(config, authenticated) {
       );
     res.json({ data: await createSession(res, user, config) });
   });
+
+  router.post("/auth/registro", limiter, async (req, res) => {
+    if (config.allowInitialSetup && !(await User.exists({})))
+      throw new ApiError(
+        409,
+        "Campus todavía necesita su cuenta de administrador inicial.",
+        "SETUP_REQUIRED",
+      );
+    formFields(req.body, ["nombre", "correo", "password"]);
+    const input = credentials(req.body, true);
+    const user = await User.create({
+      nombre: input.nombre,
+      correo: input.correo,
+      passwordHash: await hashPassword(input.password),
+      rol: "participante",
+      estado: "activo",
+    });
+    res.status(201).json({ data: await createSession(res, user, config) });
+  });
+
   router.post("/auth/refresh", limiter, (req, res) =>
     refreshSession(req, res, config),
   );
