@@ -28,6 +28,7 @@ import {
 import { ResourceForm } from "./ResourceForm.jsx";
 import { ResourceDetail } from "./ResourceDetail.jsx";
 import { EventCard } from "./EventCard.jsx";
+import { TournamentRoster } from "./TournamentRoster.jsx";
 import { EventSignupDialog } from "../registrations/EventSignupDialog.jsx";
 import { ParticipantProfileForm } from "../registrations/ParticipantProfileForm.jsx";
 // Listado con filtros, paginación y acciones autorizadas de cada catálogo.
@@ -45,6 +46,7 @@ export function ResourcePanel({ type, user, onLogout, onViewRegistrations }) {
     [form, setForm] = useState(null),
     [detail, setDetail] = useState(null),
     [registrationEvent, setRegistrationEvent] = useState(null),
+    [rosterEvent, setRosterEvent] = useState(null),
     [completingProfile, setCompletingProfile] = useState(false),
     [toast, setToast] = useState(""),
     [publishing, setPublishing] = useState("");
@@ -440,6 +442,7 @@ export function ResourcePanel({ type, user, onLogout, onViewRegistrations }) {
                 publishing={publishing}
                 onDetails={setDetail}
                 onRegister={openRegistration}
+                onRoster={setRosterEvent}
                 onEdit={(event) => setForm({ item: event })}
                 onPublish={publish}
               />
@@ -563,6 +566,15 @@ export function ResourcePanel({ type, user, onLogout, onViewRegistrations }) {
             setRefresh((value) => value + 1);
           }}
           onViewRegistrations={onViewRegistrations}
+        />
+      )}
+      {rosterEvent && (
+        <TournamentRoster
+          event={rosterEvent}
+          onClose={() => {
+            setRosterEvent(null);
+            setRefresh((value) => value + 1);
+          }}
         />
       )}
       {completingProfile && (

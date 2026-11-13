@@ -294,6 +294,80 @@ describe("Competencias: flujos y reglas con MongoDB real", () => {
     );
   });
 
+  it("filtra usuarios por institución y reserva la corrección de nacimiento al administrador", async () => {
+    const target = accounts[0];
+    const actor = await login(target);
+    const query = new URLSearchParams({
+      institucion: institution.id,
+      q: target.correo,
+      rol: "participante",
+    });
+    const path = "/api/usuarios?" + query;
+    const list = (await admin.agent.get(path).expect(200)).body.data;
+    assert.equal(list.total, 1);
+    assert.equal(list.items[0].institucionNombre, institution.nombre);
+    assert.equal(list.items[0].nacimiento, "2005-06-01");
+    assert.equal(list.items[0].passwordHash, undefined);
+    await actor.agent.get("/api/usuarios/instituciones").expect(403);
+    const options = (
+      await admin.agent.get("/api/usuarios/instituciones").expect(200)
+    ).body.data;
+    assert.ok(options.some((item) => item.id === institution.id));
+    const edit = `usuarios/${target.id}/nacimiento`;
+    await write(actor, "patch", edit, { nacimiento: "2006-02-01" }).expect(403);
+    await admin.agent
+      .patch("/api/" + edit)
+      .send({ nacimiento: "2006-02-01" })
+      .expect(403);
+    await write(admin, "patch", edit, { nacimiento: "2006-02-31" }).expect(400);
+    await write(admin, "patch", edit, { nacimiento: "2006-02-01" }).expect(200);
+    const updated = (await admin.agent.get(path).expect(200)).body.data
+      .items[0];
+    assert.equal(updated.nacimiento, "2006-02-01");
+    assert.equal(
+      (await Participant.findById(people[0].id)).nacimiento
+        .toISOString()
+        .slice(0, 10),
+      updated.nacimiento,
+    );
+  });
+
+  it("muestra inscritos activos a participantes y reserva la plantilla al responsable", async () => {
+    const event = await open();
+    const competitor = await create("equipos", team());
+    const entry = await create("inscripciones", {
+      torneo: event.id,
+      modalidad: "equipo",
+      competidor: competitor.id,
+    });
+    const actor = await login(accounts[2]);
+    const path = `/api/torneos/${event.id}/inscritos`;
+    const listing = (await actor.agent.get(path).expect(200)).body.data;
+    assert.equal(listing.total, 1);
+    assert.equal(listing.confirmed, 1);
+    assert.deepEqual(listing.items, [
+      {
+        id: entry.id,
+        nombre: competitor.nombre,
+        estado: "confirmada",
+        prueba: "",
+        integrantes: [],
+      },
+    ]);
+    const managed = (await admin.agent.get(path).expect(200)).body.data;
+    assert.deepEqual(
+      managed.items[0].integrantes,
+      people.slice(0, 2).map((person) => person.nombre),
+    );
+    await write(admin, "patch", `inscripciones/${entry.id}`, {
+      estado: "cancelada",
+      motivo: "Retiro de prueba",
+    }).expect(200);
+    assert.equal((await actor.agent.get(path).expect(200)).body.data.total, 0);
+    const draft = await create("torneos", tournament());
+    await actor.agent.get(`/api/torneos/${draft.id}/inscritos`).expect(403);
+  });
+
   it("configura disciplinas, rechaza incoherencias y protege categorías utilizadas", async () => {
     const actor = await login(organizer);
     await write(actor, "post", "disciplinas", {

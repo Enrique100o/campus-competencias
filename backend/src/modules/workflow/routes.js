@@ -333,6 +333,57 @@ export function workflowRouter(authenticated) {
     );
     res.json({ data: list(data) });
   });
+  router.get("/torneos/:id/inscritos", async (req, res) => {
+    const event = await eventFor(req.user, "torneos", req.params.id);
+    const { page: current, limit } = listPagination(req.query);
+    const filter = {
+      torneo: event._id,
+      estado: { $in: ["confirmada", "pendiente"] },
+    };
+    const [registrations, confirmed, pending] = await Promise.all([
+      Registration.find(filter)
+        .sort({ createdAt: 1, _id: 1 })
+        .skip((current - 1) * limit)
+        .limit(limit)
+        .select("modalidad competidor plantilla.nombre prueba estado")
+        .lean(),
+      Registration.countDocuments({ torneo: event._id, estado: "confirmada" }),
+      Registration.countDocuments({ torneo: event._id, estado: "pendiente" }),
+    ]);
+    const teams = await Team.find({
+      _id: {
+        $in: registrations
+          .filter((entry) => entry.modalidad !== "individual")
+          .map((entry) => entry.competidor),
+      },
+    })
+      .select("nombre")
+      .lean();
+    const names = new Map(teams.map((team) => [String(team._id), team.nombre]));
+    const manager = managesEvent(req.user, event);
+    const total = confirmed + pending;
+    res.json({
+      data: {
+        items: registrations.map((entry) => ({
+          id: String(entry._id),
+          nombre:
+            entry.modalidad === "individual"
+              ? entry.plantilla?.[0]?.nombre || "Participante"
+              : names.get(String(entry.competidor)) || "Equipo",
+          estado: entry.estado,
+          prueba: entry.prueba,
+          integrantes:
+            manager && entry.modalidad !== "individual"
+              ? entry.plantilla.map((person) => person.nombre)
+              : [],
+        })),
+        confirmed,
+        pending,
+        total,
+        pages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
+  });
   router.get("/torneos/:id/resultados", async (req, res) => {
     const event = await eventFor(req.user, "torneos", req.params.id);
     res.json({

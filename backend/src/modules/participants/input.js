@@ -3,6 +3,21 @@ import { User, Institution } from "../../models.js";
 import { ApiError, formFields, text } from "../../validation.js";
 
 import { choice, activeState, reference } from "../shared/access.js";
+
+export function birthDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value))
+    throw new ApiError(400, "Revisa la fecha de nacimiento.");
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (
+    !Number.isFinite(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== value ||
+    date > new Date() ||
+    date.getUTCFullYear() < 1900
+  )
+    throw new ApiError(400, "La fecha de nacimiento no es válida.");
+  return date;
+}
+
 // Identidad y referencias del participante; la elegibilidad deportiva se comprueba al inscribir.
 export async function participantInput(body, previous) {
   formFields(body, [
@@ -15,19 +30,7 @@ export async function participantInput(body, previous) {
     "categoria",
     "estado",
   ]);
-  if (
-    typeof body.nacimiento !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(body.nacimiento)
-  )
-    throw new ApiError(400, "Revisa la fecha de nacimiento.");
-  const nacimiento = new Date(`${body.nacimiento}T00:00:00.000Z`);
-  if (
-    !Number.isFinite(nacimiento.getTime()) ||
-    nacimiento.toISOString().slice(0, 10) !== body.nacimiento ||
-    nacimiento > new Date() ||
-    nacimiento.getUTCFullYear() < 1900
-  )
-    throw new ApiError(400, "La fecha de nacimiento no es válida.");
+  const nacimiento = birthDate(body.nacimiento);
   const user = await reference(
     User,
     body.usuario,

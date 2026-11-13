@@ -13,6 +13,8 @@ import {
   Users,
 } from "lucide-react";
 import { api } from "../../api.js";
+import { useResource } from "../../hooks/useResource.js";
+import { BirthDateDialog } from "./BirthDateDialog.jsx";
 
 const roles = {
   administrador: "Administrador",
@@ -53,12 +55,15 @@ export function UsersPanel({ user, onUserChanged, onLogout }) {
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
   const [state, setState] = useState("");
+  const [institution, setInstitution] = useState("");
   const [page, setPage] = useState(1);
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dialog, setDialog] = useState(null);
+  const [birthDateAccount, setBirthDateAccount] = useState(null);
   const [toast, setToast] = useState("");
+  const institutions = useResource("/usuarios/instituciones");
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearch(query);
@@ -81,6 +86,7 @@ export function UsersPanel({ user, onUserChanged, onLogout }) {
       limit: 8,
       ...(role ? { rol: role } : {}),
       ...(state ? { estado: state } : {}),
+      ...(institution ? { institucion: institution } : {}),
     });
     api(`/usuarios?${params}`, { signal: controller.signal })
       .then((result) => {
@@ -96,7 +102,7 @@ export function UsersPanel({ user, onUserChanged, onLogout }) {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [search, role, state, page, refresh, onLogout]);
+  }, [search, role, state, institution, page, refresh, onLogout]);
   async function saved(message) {
     setDialog(null);
     setToast(message);
@@ -214,16 +220,39 @@ export function UsersPanel({ user, onUserChanged, onLogout }) {
             <option value="activo">Activas</option>
             <option value="inactivo">Inactivas</option>
           </select>
+          <select
+            aria-label="Filtrar por institución"
+            value={institution}
+            disabled={institutions.loading || Boolean(institutions.error)}
+            onChange={(event) => {
+              setInstitution(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">Todas las instituciones</option>
+            {institutions.data?.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.nombre} · {item.ciudad}
+              </option>
+            ))}
+          </select>
           <button
             className="icon-button refresh-button"
             aria-label="Actualizar usuarios"
             disabled={loading}
-            onClick={() => setRefresh((value) => value + 1)}
+            onClick={() => {
+              setRefresh((value) => value + 1);
+              institutions.reload();
+            }}
           >
             <RefreshCw size={17} className={loading ? "spin" : ""} />
           </button>
         </div>
         <Notice>{error}</Notice>
+        <Notice>
+          {institutions.error &&
+            "No se pudieron cargar las instituciones. Pulsa Actualizar usuarios para reintentar."}
+        </Notice>
         {loading ? (
           <div className="loading-area" role="status">
             <LoaderCircle size={25} className="spin" />
@@ -257,6 +286,8 @@ export function UsersPanel({ user, onUserChanged, onLogout }) {
                   <th>Persona</th>
                   <th>Correo electrónico</th>
                   <th>Rol</th>
+                  <th>Institución</th>
+                  <th>Edad</th>
                   <th>Estado</th>
                   <th>
                     <span className="sr-only">Acciones</span>
@@ -284,6 +315,24 @@ export function UsersPanel({ user, onUserChanged, onLogout }) {
                       <span className="role-pill account-role">
                         {roles[account.rol]}
                       </span>
+                    </td>
+                    <td>{account.institucionNombre || "Sin institución"}</td>
+                    <td>
+                      {account.nacimiento ? (
+                        <div className="row-actions">
+                          <span>{account.edad} años</span>
+                          <button
+                            type="button"
+                            className="icon-button edit-button"
+                            aria-label={`Editar edad de ${account.nombre}`}
+                            onClick={() => setBirthDateAccount(account)}
+                          >
+                            <Pencil size={15} />
+                          </button>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td>
                       <span
@@ -353,6 +402,17 @@ export function UsersPanel({ user, onUserChanged, onLogout }) {
           <Check size={18} />
           {toast}
         </div>
+      )}
+      {birthDateAccount && (
+        <BirthDateDialog
+          account={birthDateAccount}
+          onClose={() => setBirthDateAccount(null)}
+          onSaved={() => {
+            setBirthDateAccount(null);
+            setToast("Fecha de nacimiento actualizada.");
+            setRefresh((value) => value + 1);
+          }}
+        />
       )}
     </>
   );

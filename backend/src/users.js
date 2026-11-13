@@ -1,6 +1,22 @@
 import { Router } from "express";
 import mongoose from "mongoose";
-import { User, Session, publicUser, roles, states } from "./models.js";
+import {
+  User,
+  Session,
+  Institution,
+  publicUser,
+  roles,
+  states,
+} from "./models.js";
+import { Participant } from "./competition-models.js";
+import { birthDate } from "./modules/participants/input.js";
+import {
+  ageOn,
+  competitionWrite,
+  id,
+  refreshActor,
+  requireRoles,
+} from "./modules/shared/access.js";
 import {
   ApiError,
   accountInput,
@@ -74,6 +90,12 @@ export function usersRouter(authenticated) {
         throw new ApiError(400, "Estado inválido.");
       filter.estado = req.query.estado;
     }
+    if (req.query.institucion)
+      filter._id = {
+        $in: await Participant.distinct("usuario", {
+          institucion: id(req.query.institucion, "institución"),
+        }),
+      };
     const [items, total, all, active, admins] = await Promise.all([
       User.find(filter)
         .sort({ nombre: 1, _id: 1 })
@@ -85,9 +107,27 @@ export function usersRouter(authenticated) {
       User.countDocuments({ estado: "activo" }),
       User.countDocuments({ estado: "activo", rol: "administrador" }),
     ]);
+    const profiles = await Participant.find({
+      usuario: { $in: items.map((user) => user._id) },
+    })
+      .select("usuario institucion nacimiento")
+      .populate("institucion", "nombre")
+      .lean();
+    const byUser = new Map(
+      profiles.map((profile) => [String(profile.usuario), profile]),
+    );
+    const today = new Date();
     res.json({
       data: {
-        items: items.map(publicUser),
+        items: items.map((user) => {
+          const profile = byUser.get(String(user._id));
+          return {
+            ...publicUser(user),
+            institucionNombre: profile?.institucion?.nombre ?? null,
+            nacimiento: profile?.nacimiento?.toISOString().slice(0, 10) ?? null,
+            edad: profile?.nacimiento ? ageOn(profile.nacimiento, today) : null,
+          };
+        }),
         total,
         page,
         pages: Math.max(1, Math.ceil(total / limit)),
@@ -95,6 +135,54 @@ export function usersRouter(authenticated) {
       },
     });
   });
+
+  router.get("/instituciones", requireAdmin, async (_req, res) => {
+    const institutions = await Institution.find()
+      .select("nombre ciudad")
+      .sort({ nombre: 1, _id: 1 })
+      .lean();
+    res.json({
+      data: institutions.map((item) => ({
+        id: String(item._id),
+        nombre: item.nombre,
+        ciudad: item.ciudad,
+      })),
+    });
+  });
+
+  router.patch(
+    "/:id/nacimiento",
+    requireAdmin,
+    requireCsrf,
+    async (req, res) => {
+      validId(req.params.id);
+      const { nacimiento } = formFields(req.body, ["nacimiento"]);
+      const date = birthDate(nacimiento);
+      const profile = await competitionWrite(async () => {
+        await refreshActor(req);
+        requireRoles(req.user, ["administrador"]);
+        const participant = await Participant.findOne({
+          usuario: req.params.id,
+        });
+        if (!participant)
+          throw new ApiError(
+            404,
+            "Este usuario todavía no tiene ficha de participante.",
+            "NOT_FOUND",
+          );
+        req.audit = { anterior: { nacimiento: participant.nacimiento } };
+        participant.nacimiento = date;
+        return participant.save();
+      });
+      res.json({
+        data: {
+          id: String(profile.usuario),
+          nacimiento: profile.nacimiento.toISOString().slice(0, 10),
+          edad: ageOn(profile.nacimiento, new Date()),
+        },
+      });
+    },
+  );
 
   router.post("/", requireAdmin, requireCsrf, async (req, res) => {
     const input = accountInput(req.body, true);

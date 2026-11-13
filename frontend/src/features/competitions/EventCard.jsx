@@ -22,6 +22,7 @@ export function EventCard({
   publishing,
   onDetails,
   onRegister,
+  onRoster,
   onEdit,
   onPublish,
 }) {
@@ -54,6 +55,13 @@ export function EventCard({
         <span>
           <CalendarDays size={15} /> Inicia {readableDate(event.inicio)}
         </span>
+        {isTournament && (
+          <span>
+            <strong>
+              {event.inscritos ?? 0} de {event.cupos} cupos ocupados
+            </strong>
+          </span>
+        )}
         {open && (
           <>
             <span>
@@ -91,6 +99,16 @@ export function EventCard({
         >
           <Eye size={16} /> Ver requisitos
         </button>
+        {isTournament && (
+          <button
+            type="button"
+            className="button button-secondary"
+            aria-label={`Ver inscritos de ${event.nombre}`}
+            onClick={() => onRoster(event)}
+          >
+            Ver inscritos
+          </button>
+        )}
         {canEdit(type, event, user) && (
           <>
             <button
